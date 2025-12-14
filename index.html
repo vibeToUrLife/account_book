@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Account Book</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="container">
+        <h1>Account Book</h1>
+        <div class="header-right">
+          <div id="authStatus" class="muted">Connecting…</div>
+          <button id="themeToggleBtn" class="btn btn-secondary" type="button" aria-pressed="false">Dark mode: Off</button>
+          <button id="signOutBtn" class="btn btn-secondary" type="button" disabled>Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container stack">
+      <section id="configCard" class="card stack" aria-label="Configuration" hidden>
+        <div id="configWarning" class="callout callout-warning" hidden></div>
+      </section>
+
+      <section id="authCard" class="card stack" aria-label="Sign in" hidden>
+        <div class="row">
+          <h2>Sign in / Sign up</h2>
+          <div class="muted small">Use email/password or Google.</div>
+        </div>
+
+        <div id="authError" class="callout callout-warning" hidden></div>
+
+        <form id="authForm" class="stack" autocomplete="off">
+          <div class="grid-2">
+            <label class="field">
+              <span>Email</span>
+              <input id="authEmail" type="email" placeholder="you@example.com" required />
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input id="authPassword" type="password" placeholder="••••••••" required minlength="6" />
+            </label>
+          </div>
+
+          <div class="row wrap">
+            <button id="signUpBtn" class="btn" type="button">Sign up</button>
+            <button id="signInBtn" class="btn btn-secondary" type="button">Sign in</button>
+            <button id="googleBtn" class="btn btn-secondary" type="button">Continue with Google</button>
+          </div>
+        </form>
+      </section>
+
+      <div id="appContent" class="stack" hidden>
+      <section class="grid-2">
+        <section class="card stack" aria-label="Categories">
+          <div class="row">
+            <h2>Categories & Budgets</h2>
+            <div class="muted small">Add a category and set its budget.</div>
+          </div>
+
+          <form id="categoryForm" class="stack" autocomplete="off">
+            <div class="grid-2">
+              <label class="field">
+                <span>Name</span>
+                <input id="categoryName" type="text" placeholder="e.g., Food" required maxlength="32" />
+              </label>
+              <label class="field">
+                <span>Budget</span>
+                <input id="categoryBudget" type="number" placeholder="0" min="0" step="0.01" required />
+              </label>
+            </div>
+            <label class="field">
+              <span>Budget period</span>
+              <select id="categoryPeriod" required>
+                <option value="month" selected>Monthly</option>
+                <option value="year">Yearly</option>
+                <option value="lifetime">Lifetime</option>
+              </select>
+            </label>
+            <div class="row">
+              <button class="btn" type="submit">Add category</button>
+              <div class="muted small">Tip: Budget balance updates when you record expense/revenue.</div>
+            </div>
+          </form>
+
+          <div class="divider"></div>
+
+          <div class="row wrap">
+            <label class="field inline">
+              <span>Budget month (for Monthly)</span>
+              <input id="budgetMonth" type="month" required />
+            </label>
+            <label class="field inline">
+              <span>Budget year (for Yearly)</span>
+              <select id="budgetYear" required></select>
+            </label>
+            <div id="budgetScope" class="muted small"></div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table" aria-label="Category table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Period</th>
+                  <th class="right">Budget</th>
+                  <th class="right">Spent</th>
+                  <th class="right">Income</th>
+                  <th class="right">Balance</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="categoryTbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card stack" aria-label="New record">
+          <div class="row">
+            <h2>Add Record</h2>
+            <div class="muted small">Choose category, expense/revenue, amount, and note.</div>
+          </div>
+
+          <form id="txForm" class="stack" autocomplete="off">
+            <label class="field">
+              <span>Category</span>
+              <select id="txCategory" required></select>
+            </label>
+
+            <div class="grid-2">
+              <label class="field">
+                <span>Type</span>
+                <select id="txType" required>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Amount</span>
+                <input id="txAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Note</span>
+              <input id="txNote" type="text" placeholder="e.g., eat" maxlength="80" />
+            </label>
+
+            <label class="field">
+              <span>Date</span>
+              <input id="txDate" type="date" required />
+            </label>
+
+            <button class="btn" type="submit">Record</button>
+          </form>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <h3 class="h3">Search notes</h3>
+            <div class="muted small">Type a word like “eat” to filter notes.</div>
+          </div>
+          <div class="row">
+            <input id="searchInput" class="search" type="search" placeholder="Search note text…" />
+            <button id="clearSearchBtn" class="btn btn-secondary" type="button">Clear</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table" aria-label="Transactions table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Type</th>
+                  <th class="right">Amount</th>
+                  <th>Note</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="txTbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="card stack" aria-label="Statistics">
+        <div class="row">
+          <h2>Statistics</h2>
+          <div class="muted small">Weekly / Monthly / Yearly totals.</div>
+        </div>
+
+        <div class="row wrap">
+          <label class="field inline">
+            <span>Range</span>
+            <select id="statsRange">
+              <option value="week">Weekly</option>
+              <option value="month" selected>Monthly</option>
+              <option value="year">Yearly</option>
+            </select>
+          </label>
+          <label id="statsDateField" class="field inline" hidden>
+            <span>Date</span>
+            <input id="statsAnchorDate" type="date" required />
+          </label>
+          <label id="statsMonthField" class="field inline">
+            <span>Month</span>
+            <input id="statsMonth" type="month" required />
+          </label>
+          <label id="statsYearField" class="field inline" hidden>
+            <span>Year</span>
+            <select id="statsYear" required></select>
+          </label>
+          <button id="refreshStatsBtn" class="btn btn-secondary" type="button" style="margin-top: 25px">Refresh</button>
+        </div>
+
+        <div class="grid-3">
+          <div class="stat">
+            <div class="muted small">Total Expense</div>
+            <div id="totalExpense" class="stat-value">0.00</div>
+          </div>
+          <div class="stat">
+            <div class="muted small">Total Revenue</div>
+            <div id="totalRevenue" class="stat-value">0.00</div>
+          </div>
+          <div class="stat">
+            <div class="muted small">Net</div>
+            <div id="netTotal" class="stat-value">0.00</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="table-wrap">
+          <table class="table" aria-label="Stats by category">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th class="right">Expense</th>
+                <th class="right">Revenue</th>
+                <th class="right">Net</th>
+              </tr>
+            </thead>
+            <tbody id="statsTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      </div>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
