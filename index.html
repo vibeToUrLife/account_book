@@ -52,8 +52,8 @@
       </section>
 
       <div id="appContent" class="stack" hidden>
-      <section class="grid-2">
-        <section class="card stack" aria-label="Categories">
+      <section class="grid-2 grid-main">
+        <section class="card stack categories-card" aria-label="Categories">
           <div class="row">
             <h2>Categories & Budgets</h2>
             <div class="muted small">Add a category and set its budget.</div>
@@ -116,7 +116,7 @@
           </div>
         </section>
 
-        <section class="card stack" aria-label="New record">
+        <section class="card stack record-card" aria-label="New record">
           <div class="row">
             <h2>Add Record</h2>
             <div class="muted small">Choose category, expense/revenue, amount, and note.</div>
@@ -180,6 +180,14 @@
               </thead>
               <tbody id="txTbody"></tbody>
             </table>
+          </div>
+
+          <div class="pager" aria-label="Transactions pagination">
+            <div id="txPageInfo" class="muted small"></div>
+            <div class="pager-actions">
+              <button id="txPrevBtn" class="btn btn-secondary" type="button">Prev</button>
+              <button id="txNextBtn" class="btn btn-secondary" type="button">Next</button>
+            </div>
           </div>
         </section>
       </section>

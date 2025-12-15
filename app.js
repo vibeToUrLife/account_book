@@ -56,6 +56,10 @@ const els = {
   txDate: document.getElementById("txDate"),
   txTbody: document.getElementById("txTbody"),
 
+  txPageInfo: document.getElementById("txPageInfo"),
+  txPrevBtn: document.getElementById("txPrevBtn"),
+  txNextBtn: document.getElementById("txNextBtn"),
+
   searchInput: document.getElementById("searchInput"),
   clearSearchBtn: document.getElementById("clearSearchBtn"),
 
@@ -311,6 +315,14 @@ let categories = [];
 let transactions = [];
 
 let searchTerm = "";
+let activeCategoryId = "";
+
+const TX_PAGE_SIZE = 10;
+let txPage = 1;
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
 
 function setWarning(text) {
   els.configWarning.textContent = text;
@@ -412,6 +424,9 @@ function renderCategoriesTable() {
           : "Lifetime";
 
     const tr = document.createElement("tr");
+    tr.dataset.categoryId = c.id;
+    tr.classList.add("clickable-row");
+    if (c.id === activeCategoryId) tr.classList.add("selected");
     tr.innerHTML = `
       <td>${escapeHtml(c.name)}</td>
       <td>${escapeHtml(periodLabel)}</td>
@@ -431,18 +446,49 @@ function renderTransactionsTable() {
   els.txTbody.innerHTML = "";
 
   const term = searchTerm.trim().toLowerCase();
-  const filtered = term
+  let filtered = term
     ? transactions.filter((t) => (t.note || "").toLowerCase().includes(term))
     : transactions;
 
-  if (filtered.length === 0) {
+  if (activeCategoryId) {
+    filtered = filtered.filter((t) => t.categoryId === activeCategoryId);
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / TX_PAGE_SIZE));
+  txPage = clamp(txPage, 1, totalPages);
+
+  if (els.txPrevBtn) els.txPrevBtn.disabled = txPage <= 1;
+  if (els.txNextBtn) els.txNextBtn.disabled = txPage >= totalPages;
+  if (els.txPageInfo) {
+    const parts = [];
+    if (activeCategoryId) {
+      const cat = categories.find((c) => c.id === activeCategoryId);
+      parts.push(`Category: ${cat?.name || "(Unknown)"}`);
+    }
+    if (term) parts.push(`Search: "${term}"`);
+    const prefix = parts.length ? `${parts.join(" • ")} — ` : "";
+
+    if (total === 0) {
+      els.txPageInfo.textContent = parts.length ? `${prefix}No records.` : "";
+    } else {
+      const start = (txPage - 1) * TX_PAGE_SIZE + 1;
+      const end = Math.min(txPage * TX_PAGE_SIZE, total);
+      els.txPageInfo.textContent = `${prefix}Showing ${start}-${end} of ${total} (Page ${txPage}/${totalPages})`;
+    }
+  }
+
+  if (total === 0) {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="6" class="muted">No records found.</td>`;
     els.txTbody.appendChild(tr);
     return;
   }
 
-  for (const tx of filtered) {
+  const startIndex = (txPage - 1) * TX_PAGE_SIZE;
+  const pageItems = filtered.slice(startIndex, startIndex + TX_PAGE_SIZE);
+
+  for (const tx of pageItems) {
     const tr = document.createElement("tr");
     const typeLabel = tx.type === "expense" ? "Expense" : "Revenue";
     tr.innerHTML = `
@@ -543,6 +589,12 @@ async function startListenersForUser(userId) {
 
   unsubCategories = onSnapshot(query(categoriesCol, orderBy("createdAt", "asc")), (snap) => {
     categories = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    if (activeCategoryId && !categories.some((c) => c.id === activeCategoryId)) {
+      activeCategoryId = "";
+      txPage = 1;
+    }
+
     renderAll();
   });
 
@@ -575,6 +627,8 @@ function setSignedOutUi() {
   stopListeners();
   categories = [];
   transactions = [];
+  activeCategoryId = "";
+  txPage = 1;
   ensureStatsYearOptions();
   ensureBudgetYearOptions();
   renderBudgetScopeLabel();
@@ -753,9 +807,19 @@ function wireEvents() {
 
   els.categoryTbody.addEventListener("click", async (e) => {
     const btn = e.target.closest("button");
-    if (!btn) return;
-    if (btn.dataset.action !== "delete-category") return;
-    await deleteCategoryById(btn.dataset.id);
+    if (btn && btn.dataset.action === "delete-category") {
+      await deleteCategoryById(btn.dataset.id);
+      return;
+    }
+
+    const row = e.target.closest("tr");
+    const id = row?.dataset?.categoryId;
+    if (!id) return;
+
+    activeCategoryId = activeCategoryId === id ? "" : id;
+    txPage = 1;
+    renderCategoriesTable();
+    renderTransactionsTable();
   });
 
   els.txForm.addEventListener("submit", async (e) => {
@@ -772,14 +836,32 @@ function wireEvents() {
 
   els.searchInput.addEventListener("input", () => {
     searchTerm = els.searchInput.value;
+    txPage = 1;
     renderTransactionsTable();
   });
 
   els.clearSearchBtn.addEventListener("click", () => {
     els.searchInput.value = "";
     searchTerm = "";
+    activeCategoryId = "";
+    txPage = 1;
+    renderCategoriesTable();
     renderTransactionsTable();
   });
+
+  if (els.txPrevBtn) {
+    els.txPrevBtn.addEventListener("click", () => {
+      txPage = Math.max(1, txPage - 1);
+      renderTransactionsTable();
+    });
+  }
+
+  if (els.txNextBtn) {
+    els.txNextBtn.addEventListener("click", () => {
+      txPage = txPage + 1;
+      renderTransactionsTable();
+    });
+  }
 
   els.refreshStatsBtn.addEventListener("click", () => {
     renderStats();
