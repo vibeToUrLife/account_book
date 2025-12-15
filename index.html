@@ -219,7 +219,8 @@
             <span>Year</span>
             <select id="statsYear" required></select>
           </label>
-          <button id="refreshStatsBtn" class="btn btn-secondary" type="button" style="margin-top: 25px">Refresh</button>
+          <button id="refreshStatsBtn" class="btn btn-secondary" type="button">Refresh</button>
+          <div id="statsRangeLabel" class="muted small full"></div>
         </div>
 
         <div class="grid-3">
@@ -235,6 +236,11 @@
             <div class="muted small">Net</div>
             <div id="netTotal" class="stat-value">0.00</div>
           </div>
+        </div>
+
+        <div class="chart-wrap" aria-label="Statistics chart">
+          <div id="statsChartMessage" class="muted small" hidden></div>
+          <canvas id="statsChart" height="140"></canvas>
         </div>
 
         <div class="divider"></div>

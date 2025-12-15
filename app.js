@@ -71,11 +71,75 @@ const els = {
   statsYearField: document.getElementById("statsYearField"),
   statsYear: document.getElementById("statsYear"),
   refreshStatsBtn: document.getElementById("refreshStatsBtn"),
+  statsRangeLabel: document.getElementById("statsRangeLabel"),
+  statsChart: document.getElementById("statsChart"),
+  statsChartMessage: document.getElementById("statsChartMessage"),
   totalExpense: document.getElementById("totalExpense"),
   totalRevenue: document.getElementById("totalRevenue"),
   netTotal: document.getElementById("netTotal"),
   statsTbody: document.getElementById("statsTbody"),
 };
+
+let ChartJs = null;
+let ChartJsRegistered = false;
+let statsChartInstance = null;
+
+async function ensureChartJs() {
+  if (ChartJs) return ChartJs;
+
+  // Prefer global Chart if available (e.g. UMD build loaded via <script>).
+  if (typeof globalThis !== "undefined" && globalThis.Chart) {
+    ChartJs = globalThis.Chart;
+    return ChartJs;
+  }
+
+  const urls = [
+    // Chart.js ESM build (requires registering components)
+    "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.js",
+    // ESM CDN fallback
+    "https://esm.sh/chart.js@4.4.1",
+  ];
+
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const mod = await import(url);
+      const Chart = mod.Chart || mod.default;
+      if (!Chart) continue;
+      ChartJs = Chart;
+
+      if (!ChartJsRegistered && mod.registerables && typeof Chart.register === "function") {
+        Chart.register(...mod.registerables);
+        ChartJsRegistered = true;
+      }
+
+      return ChartJs;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  throw lastError || new Error("Failed to load Chart.js");
+}
+
+function setStatsChartMessage(message) {
+  if (!els.statsChartMessage || !els.statsChart) return;
+  const msg = (message || "").trim();
+  if (!msg) {
+    els.statsChartMessage.hidden = true;
+    els.statsChart.style.visibility = "visible";
+    return;
+  }
+
+  els.statsChartMessage.textContent = msg;
+  els.statsChartMessage.hidden = false;
+  els.statsChart.style.visibility = "hidden";
+}
+
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
+}
 
 const THEME_KEY = "accountBook.theme";
 
@@ -93,6 +157,9 @@ function applyTheme(theme) {
     els.themeToggleBtn.setAttribute("aria-pressed", String(isDark));
     els.themeToggleBtn.textContent = `Dark mode: ${isDark ? "On" : "Off"}`;
   }
+
+  // Update chart colors to match the theme.
+  renderStats();
 }
 
 function initTheme() {
@@ -122,6 +189,13 @@ function money(n) {
 
 function todayISO() {
   const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function dateObjToISO(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -186,6 +260,172 @@ function startOfYear(date) {
 function addDays(date, days) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
+  return d;
+}
+
+function setStatsRangeLabel(range, start, endExclusive) {
+  if (!els.statsRangeLabel) return;
+  const endInclusive = addDays(endExclusive, -1);
+  const startISO = dateObjToISO(start);
+  const endISO = dateObjToISO(endInclusive);
+  const prefix = range === "week" ? "Week" : range === "month" ? "Month" : "Year";
+  els.statsRangeLabel.textContent = `${prefix} range: ${startISO} → ${endISO}`;
+}
+
+
+
+async function renderStatsChart(range, start, endExclusive) {
+  if (!els.statsChart) return;
+
+  // Lazy-load chart library only when needed.
+  let Chart;
+  try {
+    Chart = await ensureChartJs();
+  } catch {
+    // If the CDN is blocked, show a friendly message instead of a blank area.
+    if (statsChartInstance) {
+      statsChartInstance.destroy();
+      statsChartInstance = null;
+    }
+    setStatsChartMessage("Chart couldn’t load (network/CDN blocked). Try another network or disable ad-block for this site.");
+    return;
+  }
+
+  // Aggregate expenses by category
+  const categoryTotals = {};
+  let totalExpense = 0;
+
+  for (const tx of transactions) {
+    const d = new Date(tx.dateISO);
+    if (!(d >= start && d < endExclusive)) continue;
+    if (tx.type !== "expense") continue;
+
+    const catId = tx.categoryId || "uncategorized";
+    categoryTotals[catId] = (categoryTotals[catId] || 0) + tx.amount;
+    totalExpense += tx.amount;
+  }
+
+  // Prepare data for Chart.js
+  const labels = [];
+  const dataPoints = [];
+  const backgroundColors = [];
+
+  // Helper to get category name
+  const getCatName = (id) => {
+    if (id === "uncategorized") return "Uncategorized";
+    const c = categories.find((cat) => cat.id === id);
+    return c ? c.name : "Unknown";
+  };
+
+  // Sort categories by amount desc
+  const sortedCatIds = Object.keys(categoryTotals).sort(
+    (a, b) => categoryTotals[b] - categoryTotals[a]
+  );
+
+  if (sortedCatIds.length === 0 || totalExpense <= 0) {
+    if (statsChartInstance) {
+      statsChartInstance.destroy();
+      statsChartInstance = null;
+    }
+    setStatsChartMessage("No expense data in this range.");
+    return;
+  }
+
+  // Build a palette from existing theme tokens (no new hard-coded theme colors).
+  const primary = cssVar("--primary", "#6ea8fe");
+  const danger = cssVar("--danger", "#ff6b6b");
+  const warning = cssVar("--warning", "#ffd166");
+
+  const withAlpha = (color, alpha) => {
+    const a = Math.max(0, Math.min(1, alpha));
+    if (!color) return `rgba(0,0,0,${a})`;
+    const c = String(color).trim();
+    if (c.startsWith("rgba(")) {
+      return c.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^\)]+\)/, `rgba($1,$2,$3,${a})`);
+    }
+    if (c.startsWith("rgb(")) {
+      return c.replace(/rgb\(([^,]+),([^,]+),([^\)]+)\)/, `rgba($1,$2,$3,${a})`);
+    }
+    if (c.startsWith("#") && (c.length === 7 || c.length === 4)) {
+      const hex = c.length === 4 ? `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}` : c;
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+    return c;
+  };
+
+  const baseColors = [primary, danger, warning];
+  const alphaSteps = [0.85, 0.65, 0.5, 0.35];
+
+  sortedCatIds.forEach((id, index) => {
+    labels.push(getCatName(id));
+    dataPoints.push(Math.round(categoryTotals[id] * 100) / 100);
+    const base = baseColors[index % baseColors.length];
+    const alpha = alphaSteps[Math.floor(index / baseColors.length) % alphaSteps.length];
+    backgroundColors.push(withAlpha(base, alpha));
+  });
+
+  const text = cssVar("--text", "rgba(255,255,255,0.92)");
+  const border = cssVar("--border", "rgba(255,255,255,0.12)");
+
+  const ctx = els.statsChart.getContext("2d");
+  if (!ctx) return;
+
+  const data = {
+    labels,
+    datasets: [
+      {
+        data: dataPoints,
+        backgroundColor: backgroundColors,
+        borderColor: border,
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "right",
+        labels: { color: text },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const val = context.parsed;
+            const pct =
+              totalExpense > 0 ? Math.round((val / totalExpense) * 100) : 0;
+            return `${context.label}: ${money(val)} (${pct}%)`;
+          },
+        },
+      },
+    },
+  };
+
+  if (statsChartInstance) {
+    statsChartInstance.destroy();
+  }
+
+  try {
+    statsChartInstance = new Chart(ctx, {
+      type: "pie",
+      data,
+      options,
+    });
+    setStatsChartMessage("");
+  } catch {
+    statsChartInstance = null;
+    setStatsChartMessage("Chart failed to render. Please refresh and try again.");
+  }
+}
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
   return d;
 }
 
@@ -509,6 +749,10 @@ function renderStats() {
   const range = els.statsRange.value;
   const { start, endExclusive } = rangeForUi(range);
 
+  setStatsRangeLabel(range, start, endExclusive);
+  // Chart updates async (doesn't block the rest of the UI).
+  renderStatsChart(range, start, endExclusive);
+
   const byCategory = new Map();
   let totalExpense = 0;
   let totalRevenue = 0;
@@ -658,6 +902,9 @@ function friendlyAuthError(err) {
   if (code === "auth/popup-blocked") return "Google sign-in popup was blocked by the browser. Try again or use a normal browser (Chrome/Safari).";
   if (code === "auth/operation-not-supported-in-this-environment") {
     return "Google sign-in is not supported in this browser (common in in-app browsers). Open the site in Chrome/Safari and try again.";
+  }
+  if (code === "auth/network-request-failed") {
+    return "Network request failed. Check your connection, disable VPN/ad blocker, and try again. On mobile, open the site in Chrome/Safari (not an in-app browser) and make sure cookies are allowed.";
   }
   if (msg.includes("requested action is invalid")) {
     return "Google sign-in failed in this mobile browser. Try opening the site in Chrome/Safari (not an in-app browser), and confirm your domain is added to Firebase Auth → Authorized domains.";

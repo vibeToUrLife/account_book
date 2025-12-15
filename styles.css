@@ -123,6 +123,8 @@ h1 { font-size: 18px; margin: 0; }
 .row { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
 .row.wrap { flex-wrap: wrap; justify-content: flex-start; }
 
+.full { flex-basis: 100%; }
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr;
@@ -232,6 +234,29 @@ input:focus, select:focus {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
+}
+
+.chart-wrap {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--stat-bg);
+}
+
+#statsChartMessage {
+  position: absolute;
+  inset: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px;
+}
+
+.chart-wrap canvas {
+  width: 100%;
+  max-height: 260px;
 }
 
 .pager {
