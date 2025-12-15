@@ -31,6 +31,7 @@ let firebaseConfig = null;
 let app = null;
 let auth = null;
 let db = null;
+let authPersistenceMode = "unknown";
 
 export async function initFirebase() {
   try {
@@ -53,11 +54,14 @@ export async function initFirebase() {
   // If local persistence is blocked, fall back to session persistence.
   try {
     await setPersistence(auth, browserLocalPersistence);
+    authPersistenceMode = "local";
   } catch {
     try {
       await setPersistence(auth, browserSessionPersistence);
+      authPersistenceMode = "session";
     } catch {
       // ignore; Firebase will fall back to in-memory persistence
+      authPersistenceMode = "memory";
     }
   }
 
@@ -71,10 +75,11 @@ export async function initFirebase() {
         code: e?.code || "",
         message: e?.message || "",
       },
+      persistenceMode: authPersistenceMode,
     };
   }
 
-  return { ok: true, redirectError: null };
+  return { ok: true, redirectError: null, persistenceMode: authPersistenceMode };
 }
 
 export function watchAuth(callback) {

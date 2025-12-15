@@ -937,6 +937,14 @@ async function main() {
     setAuthError(friendlyAuthError(init.redirectError));
   }
 
+  if (init.persistenceMode === "memory") {
+    // In-memory persistence means auth state is lost on full page reload/redirect.
+    // This commonly happens in in-app browsers or when storage/cookies are blocked.
+    setAuthError(
+      "This browser is blocking storage/cookies, so sign-in may not persist. Open this site in Chrome/Safari (not an in-app browser) and try again."
+    );
+  }
+
   setWarning("");
   setAuthStatus("Checking session…");
 
