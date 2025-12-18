@@ -13,6 +13,7 @@ const {
   addDoc,
   deleteDoc,
   doc,
+  getDoc,
   setDoc,
   onSnapshot,
   orderBy,
@@ -37,6 +38,14 @@ const els = {
   authError: document.getElementById("authError"),
 
   appContent: document.getElementById("appContent"),
+  appError: document.getElementById("appError"),
+  undoToast: document.getElementById("undoToast"),
+  undoText: document.getElementById("undoText"),
+  undoBtn: document.getElementById("undoBtn"),
+  confirmToast: document.getElementById("confirmToast"),
+  confirmText: document.getElementById("confirmText"),
+  confirmYesBtn: document.getElementById("confirmYesBtn"),
+  confirmNoBtn: document.getElementById("confirmNoBtn"),
 
   categoryForm: document.getElementById("categoryForm"),
   categoryName: document.getElementById("categoryName"),
@@ -585,6 +594,156 @@ function setAuthStatus(text) {
   els.authStatus.textContent = text;
 }
 
+function setAppError(text) {
+  if (!els.appError) return;
+  const msg = String(text || "").trim();
+  els.appError.textContent = msg;
+  els.appError.hidden = !msg;
+}
+
+let pendingUndo = null;
+let pendingConfirm = null;
+
+function clearUndoToast() {
+  if (pendingUndo?.timer) {
+    clearTimeout(pendingUndo.timer);
+  }
+  pendingUndo = null;
+  if (els.undoToast) els.undoToast.hidden = true;
+  if (els.undoText) els.undoText.textContent = "";
+}
+
+function showUndoToast({ message, onUndo }) {
+  if (!els.undoToast || !els.undoText || !els.undoBtn) return;
+
+  // Only allow one pending undo at a time.
+  clearUndoToast();
+
+  els.undoText.textContent = message;
+  els.undoToast.hidden = false;
+
+  const undoHandler = async () => {
+    // Prevent double-clicking undo.
+    els.undoBtn.disabled = true;
+    try {
+      await onUndo();
+      clearUndoToast();
+    } catch (e) {
+      setAppError(friendlyDbError(e));
+      clearUndoToast();
+    } finally {
+      els.undoBtn.disabled = false;
+    }
+  };
+
+  pendingUndo = {
+    onUndo: undoHandler,
+    timer: setTimeout(() => {
+      clearUndoToast();
+    }, 3000),
+  };
+
+  // Replace handler each time toast is shown.
+  els.undoBtn.onclick = undoHandler;
+}
+
+function clearConfirmToast() {
+  if (pendingConfirm?.resolver) {
+    pendingConfirm.resolver(false);
+  }
+  pendingConfirm = null;
+  if (els.confirmToast) els.confirmToast.hidden = true;
+  if (els.confirmText) els.confirmText.textContent = "";
+}
+
+function showConfirmToast(message) {
+  if (!els.confirmToast || !els.confirmText || !els.confirmYesBtn || !els.confirmNoBtn) {
+    return Promise.resolve(typeof window === "undefined" ? true : window.confirm(message));
+  }
+
+  clearConfirmToast();
+
+  els.confirmText.textContent = message;
+  els.confirmToast.hidden = false;
+  els.confirmYesBtn.disabled = false;
+  els.confirmNoBtn.disabled = false;
+
+  return new Promise((resolve) => {
+    pendingConfirm = { resolver: resolve };
+
+    const cleanup = () => {
+      if (pendingConfirm?.resolver === resolve) {
+        pendingConfirm = null;
+      }
+      els.confirmToast.hidden = true;
+      els.confirmText.textContent = "";
+    };
+
+    els.confirmYesBtn.onclick = () => {
+      els.confirmYesBtn.disabled = true;
+      els.confirmNoBtn.disabled = true;
+      cleanup();
+      resolve(true);
+    };
+
+    els.confirmNoBtn.onclick = () => {
+      els.confirmYesBtn.disabled = true;
+      els.confirmNoBtn.disabled = true;
+      cleanup();
+      resolve(false);
+    };
+  });
+}
+
+function stripUndefined(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (Array.isArray(value)) return value.map(stripUndefined);
+  if (typeof value !== "object") return value;
+  const out = {};
+  for (const [k, v] of Object.entries(value)) {
+    const cleaned = stripUndefined(v);
+    if (cleaned !== undefined) out[k] = cleaned;
+  }
+  return out;
+}
+
+function friendlyDbError(err) {
+  const code = err?.code || "";
+  if (code === "permission-denied") {
+    return "Permission denied by Firestore Rules. Check that you’re signed in and that your Firestore rules allow read/write for this user.";
+  }
+  if (code === "unauthenticated") {
+    return "You’re signed out. Please sign in again.";
+  }
+  if (code === "unavailable") {
+    return "Firestore is temporarily unavailable (network/offline). Check your connection and try again.";
+  }
+  if (code === "resource-exhausted") {
+    return "Quota exceeded (resource exhausted). Try again later or check Firebase usage/quota.";
+  }
+  if (code === "not-found") {
+    return "Item not found (it may have been deleted in another tab).";
+  }
+  return err?.message || "Operation failed.";
+}
+
+async function withDisabled(elements, fn) {
+  const list = Array.isArray(elements) ? elements : [elements];
+  const toggled = [];
+  for (const el of list) {
+    if (el && typeof el === "object" && "disabled" in el) {
+      toggled.push(el);
+      el.disabled = true;
+    }
+  }
+  try {
+    await fn();
+  } finally {
+    for (const el of toggled) el.disabled = false;
+  }
+}
+
 function computeCategoryTotals(categoryId, budgetPeriod, referenceDate) {
   let spent = 0;
   let income = 0;
@@ -893,6 +1052,9 @@ function setSignedOutUi() {
   transactions = [];
   activeCategoryId = "";
   txPage = 1;
+  setAppError("");
+  clearUndoToast();
+  clearConfirmToast();
   ensureStatsYearOptions();
   ensureBudgetYearOptions();
   renderBudgetScopeLabel();
@@ -907,6 +1069,7 @@ async function setSignedInUi(user) {
   els.appContent.hidden = false;
   els.signOutBtn.disabled = false;
   setAuthError("");
+  setAppError("");
   await startListenersForUser(uid);
 }
 
@@ -1119,8 +1282,14 @@ function wireEvents() {
   }
 
   els.signOutBtn.addEventListener("click", async () => {
+    setAppError("");
     els.signOutBtn.disabled = true;
-    await signOutUser();
+    try {
+      await signOutUser();
+    } catch (e) {
+      setAppError(friendlyDbError(e));
+      els.signOutBtn.disabled = false;
+    }
   });
 
   els.signUpBtn.addEventListener("click", async () => {
@@ -1170,11 +1339,18 @@ function wireEvents() {
 
   els.categoryForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (editingCategoryId) {
-      await updateCategory();
-    } else {
-      await addCategory();
-    }
+    setAppError("");
+    await withDisabled([els.categorySubmitBtn, els.cancelCategoryEdit], async () => {
+      try {
+        if (editingCategoryId) {
+          await updateCategory();
+        } else {
+          await addCategory();
+        }
+      } catch (err) {
+        setAppError(friendlyDbError(err));
+      }
+    });
   });
 
   els.categoryTbody.addEventListener("click", async (e) => {
@@ -1183,7 +1359,37 @@ function wireEvents() {
       const action = btn.dataset.action;
       const id = btn.dataset.id;
       if (action === "delete-category") {
-        await deleteCategoryById(id);
+        setAppError("");
+        const ok = await showConfirmToast("Delete this category? (Transactions in this category are not deleted.)");
+        if (!ok) return;
+
+        await withDisabled(btn, async () => {
+          try {
+            const { categories: categoriesCol } = userCollections(uid);
+            const docRef = doc(categoriesCol, id);
+
+            let backup = categories.find((c) => c.id === id) || null;
+            if (!backup) {
+              const snap = await getDoc(docRef);
+              backup = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+            }
+
+            await deleteCategoryById(id);
+
+            if (backup) {
+              const dataToRestore = stripUndefined({ ...backup });
+              delete dataToRestore.id;
+              showUndoToast({
+                message: `Category deleted. Undo?`,
+                onUndo: async () => {
+                  await setDoc(docRef, dataToRestore);
+                },
+              });
+            }
+          } catch (err) {
+            setAppError(friendlyDbError(err));
+          }
+        });
         return;
       }
       if (action === "edit-category") {
@@ -1216,11 +1422,18 @@ function wireEvents() {
 
   els.txForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (editingTransactionId) {
-      await updateTransaction();
-    } else {
-      await addTransaction();
-    }
+    setAppError("");
+    await withDisabled([els.txSubmitBtn, els.cancelTxEdit], async () => {
+      try {
+        if (editingTransactionId) {
+          await updateTransaction();
+        } else {
+          await addTransaction();
+        }
+      } catch (err) {
+        setAppError(friendlyDbError(err));
+      }
+    });
   });
 
   els.txTbody.addEventListener("click", async (e) => {
@@ -1229,7 +1442,37 @@ function wireEvents() {
     const action = btn.dataset.action;
     const id = btn.dataset.id;
     if (action === "delete-tx") {
-      await deleteTransactionById(id);
+      setAppError("");
+      const ok = await showConfirmToast("Delete this record?");
+      if (!ok) return;
+
+      await withDisabled(btn, async () => {
+        try {
+          const { transactions: txCol } = userCollections(uid);
+          const docRef = doc(txCol, id);
+
+          let backup = transactions.find((t) => t.id === id) || null;
+          if (!backup) {
+            const snap = await getDoc(docRef);
+            backup = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+          }
+
+          await deleteTransactionById(id);
+
+          if (backup) {
+            const dataToRestore = stripUndefined({ ...backup });
+            delete dataToRestore.id;
+            showUndoToast({
+              message: "Record deleted. Undo?",
+              onUndo: async () => {
+                await setDoc(docRef, dataToRestore);
+              },
+            });
+          }
+        } catch (err) {
+          setAppError(friendlyDbError(err));
+        }
+      });
       return;
     }
     if (action === "edit-tx") {

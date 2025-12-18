@@ -52,6 +52,24 @@
       </section>
 
       <div id="appContent" class="stack" hidden>
+        <div id="appError" class="callout callout-warning" hidden></div>
+
+        <div id="undoToast" class="callout callout-warning" hidden role="status" aria-live="polite">
+          <div class="row wrap">
+            <div id="undoText" class="small"></div>
+            <button id="undoBtn" class="btn btn-secondary" type="button">Undo</button>
+          </div>
+        </div>
+
+        <div id="confirmToast" class="callout callout-warning" hidden role="dialog" aria-modal="false">
+          <div class="row wrap">
+            <div id="confirmText" class="small"></div>
+            <div class="row" style="gap: 8px; justify-content: flex-end; flex: 1;">
+              <button id="confirmYesBtn" class="btn btn-danger btn-small" type="button">Delete</button>
+              <button id="confirmNoBtn" class="btn btn-secondary btn-small" type="button">Cancel</button>
+            </div>
+          </div>
+        </div>
       <section class="grid-2 grid-main">
         <section class="card stack categories-card" aria-label="Categories">
           <div class="row">
