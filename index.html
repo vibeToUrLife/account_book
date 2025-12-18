@@ -79,7 +79,8 @@
               </select>
             </label>
             <div class="row">
-              <button class="btn" type="submit">Add category</button>
+              <button id="categorySubmitBtn" class="btn" type="submit">Add category</button>
+              <button id="cancelCategoryEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
               <div class="muted small">Tip: Budget balance updates when you record expense/revenue.</div>
             </div>
           </form>
@@ -152,7 +153,8 @@
               <input id="txDate" type="date" required />
             </label>
 
-            <button class="btn" type="submit">Record</button>
+            <button id="txSubmitBtn" class="btn" type="submit">Record</button>
+            <button id="cancelTxEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
           </form>
 
           <div class="divider"></div>
@@ -219,7 +221,7 @@
             <span>Year</span>
             <select id="statsYear" required></select>
           </label>
-          <button id="refreshStatsBtn" class="btn btn-secondary" type="button">Refresh</button>
+          <button id="refreshStatsBtn" class="btn btn-secondary" type="button" style="margin-top:20px">Refresh</button>
           <div id="statsRangeLabel" class="muted small full"></div>
         </div>
 

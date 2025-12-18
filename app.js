@@ -43,6 +43,8 @@ const els = {
   categoryBudget: document.getElementById("categoryBudget"),
   categoryPeriod: document.getElementById("categoryPeriod"),
   categoryTbody: document.getElementById("categoryTbody"),
+  categorySubmitBtn: document.getElementById("categorySubmitBtn"),
+  cancelCategoryEdit: document.getElementById("cancelCategoryEdit"),
 
   budgetMonth: document.getElementById("budgetMonth"),
   budgetYear: document.getElementById("budgetYear"),
@@ -55,6 +57,8 @@ const els = {
   txNote: document.getElementById("txNote"),
   txDate: document.getElementById("txDate"),
   txTbody: document.getElementById("txTbody"),
+  txSubmitBtn: document.getElementById("txSubmitBtn"),
+  cancelTxEdit: document.getElementById("cancelTxEdit"),
 
   txPageInfo: document.getElementById("txPageInfo"),
   txPrevBtn: document.getElementById("txPrevBtn"),
@@ -83,6 +87,8 @@ const els = {
 let ChartJs = null;
 let ChartJsRegistered = false;
 let statsChartInstance = null;
+let editingCategoryId = null;
+let editingTransactionId = null;
 
 async function ensureChartJs() {
   if (ChartJs) return ChartJs;
@@ -675,7 +681,10 @@ function renderCategoriesTable() {
       <td class="right">${money(income)}</td>
       <td class="right">${money(effectiveBudgetBalance)}</td>
       <td class="right">
-        <button class="btn btn-danger" type="button" data-action="delete-category" data-id="${c.id}">Delete</button>
+        <div class="row-actions">
+          <button class="btn btn-small" type="button" data-action="edit-category" data-id="${c.id}">Edit</button>
+          <button class="btn btn-danger btn-small" type="button" data-action="delete-category" data-id="${c.id}">Delete</button>
+        </div>
       </td>
     `;
     els.categoryTbody.appendChild(tr);
@@ -693,6 +702,14 @@ function renderTransactionsTable() {
   if (activeCategoryId) {
     filtered = filtered.filter((t) => t.categoryId === activeCategoryId);
   }
+
+  // Sort transactions by date (newest first). Work on a copy to avoid mutating the
+  // original `transactions` array in-place.
+  filtered = filtered.slice().sort((a, b) => {
+    const ta = a && a.dateISO ? new Date(a.dateISO).getTime() : 0;
+    const tb = b && b.dateISO ? new Date(b.dateISO).getTime() : 0;
+    return tb - ta;
+  });
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / TX_PAGE_SIZE));
@@ -738,7 +755,10 @@ function renderTransactionsTable() {
       <td class="right">${money(tx.amount)}</td>
       <td>${escapeHtml(tx.note || "")}</td>
       <td class="right">
-        <button class="btn btn-danger" type="button" data-action="delete-tx" data-id="${tx.id}">Delete</button>
+        <div class="row-actions">
+          <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${tx.id}">Edit</button>
+          <button class="btn btn-danger btn-small" type="button" data-action="delete-tx" data-id="${tx.id}">Delete</button>
+        </div>
       </td>
     `;
     els.txTbody.appendChild(tr);
@@ -953,6 +973,46 @@ async function addCategory() {
   els.categoryName.focus();
 }
 
+async function updateCategory() {
+  if (!editingCategoryId) return;
+  const name = normalizeText(els.categoryName.value);
+  const budget = Number(els.categoryBudget.value);
+  const budgetPeriod = els.categoryPeriod.value;
+  if (!name) return;
+  if (!Number.isFinite(budget) || budget < 0) return;
+  if (!["month", "year", "lifetime"].includes(budgetPeriod)) return;
+
+  const { categories: categoriesCol } = userCollections(uid);
+  await setDoc(doc(categoriesCol, editingCategoryId), {
+    name,
+    budget: Math.round(budget * 100) / 100,
+    budgetPeriod,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+
+  // Reset edit state
+  cancelCategoryEdit();
+}
+
+function startCategoryEdit(id) {
+  const c = categories.find((x) => x.id === id);
+  if (!c) return;
+  editingCategoryId = id;
+  els.categoryName.value = c.name || "";
+  els.categoryBudget.value = c.budget != null ? String(c.budget) : "";
+  els.categoryPeriod.value = c.budgetPeriod || "month";
+  if (els.categorySubmitBtn) els.categorySubmitBtn.textContent = "Save";
+  if (els.cancelCategoryEdit) els.cancelCategoryEdit.hidden = false;
+  els.categoryName.focus();
+}
+
+function cancelCategoryEdit() {
+  editingCategoryId = null;
+  els.categoryForm.reset();
+  if (els.categorySubmitBtn) els.categorySubmitBtn.textContent = "Add category";
+  if (els.cancelCategoryEdit) els.cancelCategoryEdit.hidden = true;
+}
+
 async function deleteCategoryById(categoryId) {
   // Only delete the category doc (does not delete old transactions).
   const { categories: categoriesCol } = userCollections(uid);
@@ -990,6 +1050,59 @@ async function addTransaction() {
   els.txAmount.value = "";
   els.txNote.value = "";
   els.txAmount.focus();
+}
+
+async function updateTransaction() {
+  if (!editingTransactionId) return;
+  const categoryId = els.txCategory.value;
+  const type = els.txType.value;
+  const amount = parsePositiveAmount(els.txAmount.value);
+  const note = normalizeText(els.txNote.value);
+  const dateISO = els.txDate.value;
+
+  if (!categoryId) return;
+  if (type !== "expense" && type !== "revenue") return;
+  if (amount == null) return;
+  if (!dateISO) return;
+
+  const category = categories.find((c) => c.id === categoryId);
+  const categoryName = category ? category.name : "(Unknown)";
+  const { transactions: txCol } = userCollections(uid);
+
+  await setDoc(doc(txCol, editingTransactionId), {
+    categoryId,
+    categoryName,
+    type,
+    amount,
+    note,
+    noteLower: note.toLowerCase(),
+    dateISO,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+
+  cancelTxEdit();
+  txPage = 1;
+}
+
+function startTxEdit(id) {
+  const tx = transactions.find((t) => t.id === id);
+  if (!tx) return;
+  editingTransactionId = id;
+  els.txCategory.value = tx.categoryId || "";
+  els.txType.value = tx.type || "expense";
+  els.txAmount.value = tx.amount != null ? String(tx.amount) : "";
+  els.txNote.value = tx.note || "";
+  els.txDate.value = tx.dateISO || todayISO();
+  if (els.txSubmitBtn) els.txSubmitBtn.textContent = "Save";
+  if (els.cancelTxEdit) els.cancelTxEdit.hidden = false;
+  els.txAmount.focus();
+}
+
+function cancelTxEdit() {
+  editingTransactionId = null;
+  els.txForm.reset();
+  if (els.txSubmitBtn) els.txSubmitBtn.textContent = "Record";
+  if (els.cancelTxEdit) els.cancelTxEdit.hidden = true;
 }
 
 async function deleteTransactionById(txId) {
@@ -1057,14 +1170,26 @@ function wireEvents() {
 
   els.categoryForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await addCategory();
+    if (editingCategoryId) {
+      await updateCategory();
+    } else {
+      await addCategory();
+    }
   });
 
   els.categoryTbody.addEventListener("click", async (e) => {
     const btn = e.target.closest("button");
-    if (btn && btn.dataset.action === "delete-category") {
-      await deleteCategoryById(btn.dataset.id);
-      return;
+    if (btn) {
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      if (action === "delete-category") {
+        await deleteCategoryById(id);
+        return;
+      }
+      if (action === "edit-category") {
+        startCategoryEdit(id);
+        return;
+      }
     }
 
     const row = e.target.closest("tr");
@@ -1091,14 +1216,26 @@ function wireEvents() {
 
   els.txForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await addTransaction();
+    if (editingTransactionId) {
+      await updateTransaction();
+    } else {
+      await addTransaction();
+    }
   });
 
   els.txTbody.addEventListener("click", async (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
-    if (btn.dataset.action !== "delete-tx") return;
-    await deleteTransactionById(btn.dataset.id);
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+    if (action === "delete-tx") {
+      await deleteTransactionById(id);
+      return;
+    }
+    if (action === "edit-tx") {
+      startTxEdit(id);
+      return;
+    }
   });
 
   els.searchInput.addEventListener("input", () => {
@@ -1115,6 +1252,18 @@ function wireEvents() {
     renderCategoriesTable();
     renderTransactionsTable();
   });
+
+  if (els.cancelCategoryEdit) {
+    els.cancelCategoryEdit.addEventListener("click", () => {
+      cancelCategoryEdit();
+    });
+  }
+
+  if (els.cancelTxEdit) {
+    els.cancelTxEdit.addEventListener("click", () => {
+      cancelTxEdit();
+    });
+  }
 
   if (els.txPrevBtn) {
     els.txPrevBtn.addEventListener("click", () => {

@@ -254,6 +254,21 @@ input:focus, select:focus {
   padding: 12px;
 }
 
+/* Action button container for table rows */
+.row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Smaller buttons used in table row actions */
+.btn-small {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
 .chart-wrap canvas {
   width: 100%;
   max-height: 260px;
