@@ -343,6 +343,9 @@ input:focus, select:focus {
   width: min(440px, calc(100% - 32px));
   z-index: 20;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  background: var(--card);
+  border-color: var(--warning-border);
+  color: var(--text);
 }
 
 #confirmToast {
@@ -353,6 +356,9 @@ input:focus, select:focus {
   width: min(440px, calc(100% - 32px));
   z-index: 21;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.20);
+  background: var(--card);
+  border-color: var(--warning-border);
+  color: var(--text);
 }
 
 .stat {
