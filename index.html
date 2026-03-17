@@ -4,12 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Account Book</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css?v=2" />
   </head>
   <body>
     <header class="app-header">
       <div class="container">
-        <h1>Account Book</h1>
+        <div class="header-left">
+          <button id="menuBtn" class="btn btn-secondary menu-btn" type="button" title="Menu">☰</button>
+          <h1>💰 Account Book</h1>
+        </div>
         <div class="header-right">
           <div id="authStatus" class="muted small">Connecting…</div>
           <button id="themeToggleBtn" class="btn btn-secondary" type="button" aria-pressed="false" title="Toggle dark mode">🌓</button>
@@ -17,6 +23,33 @@
         </div>
       </div>
     </header>
+
+    <!-- Sidebar Navigation -->
+    <div id="sidebarOverlay" class="sidebar-overlay" hidden></div>
+    <nav id="sidebar" class="sidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <h2>💰 Menu</h2>
+        <button id="closeSidebar" class="btn btn-secondary btn-small" type="button">✕</button>
+      </div>
+      <div class="sidebar-nav">
+        <button class="sidebar-item active" data-view="record" type="button">
+          <span class="sidebar-icon">✏️</span>
+          <span>Add Record</span>
+        </button>
+        <button class="sidebar-item" data-view="records" type="button">
+          <span class="sidebar-icon">📝</span>
+          <span>Record List</span>
+        </button>
+        <button class="sidebar-item" data-view="budget" type="button">
+          <span class="sidebar-icon">🏦</span>
+          <span>Budget</span>
+        </button>
+        <button class="sidebar-item" data-view="stats" type="button">
+          <span class="sidebar-icon">📊</span>
+          <span>Statistics</span>
+        </button>
+      </div>
+    </nav>
 
     <main class="container stack">
       <section id="configCard" class="card stack" aria-label="Configuration" hidden>
@@ -70,70 +103,13 @@
             </div>
           </div>
         </div>
-      <section class="grid-2 grid-main">
-        <section class="card stack categories-card" aria-label="Categories">
+
+      <div class="view-container">
+
+        <!-- VIEW: Add Record -->
+        <section class="card stack view-section" data-view="record" aria-label="New record">
           <div class="row">
-            <h2>Categories & Budgets</h2>
-            <div class="muted small">Add a category and set its budget.</div>
-          </div>
-
-          <form id="categoryForm" class="stack" autocomplete="off">
-            <div class="grid-2">
-              <label class="field">
-                <span>Name</span>
-                <input id="categoryName" type="text" placeholder="e.g., Food" required maxlength="32" />
-              </label>
-              <label class="field">
-                <span>Budget</span>
-                <input id="categoryBudget" type="number" placeholder="0" min="0" step="0.01" required />
-              </label>
-            </div>
-            <label class="field">
-              <span>Budget period</span>
-              <select id="categoryPeriod" required>
-                <option value="month" selected>Monthly</option>
-                <option value="year">Yearly</option>
-                <option value="lifetime">Lifetime</option>
-              </select>
-            </label>
-            <div class="row">
-              <button id="categorySubmitBtn" class="btn" type="submit">Add category</button>
-              <button id="cancelCategoryEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
-              <div class="muted small">Tip: Budget balance updates when you record expense/revenue.</div>
-            </div>
-          </form>
-
-          <div class="divider"></div>
-
-          <div class="row wrap">
-            <label class="field inline">
-              <span>Budget month (for Monthly & Yearly)</span>
-              <input id="budgetMonth" type="month" required />
-            </label>
-            <div id="budgetScope" class="muted small"></div>
-          </div>
-
-          <div class="table-wrap">
-            <table class="table" aria-label="Category table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Period</th>
-                  <th class="right">Budget</th>
-                  <th class="right">Spent</th>
-                  <th class="right">Income</th>
-                  <th class="right">Balance</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="categoryTbody"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="card stack record-card" aria-label="New record">
-          <div class="row">
-            <h2>Add Record</h2>
+            <h2>➕ Add Record</h2>
             <div class="muted small">Choose category, expense/revenue, amount, and note.</div>
           </div>
 
@@ -178,22 +154,20 @@
             <div class="row wrap">
               <button id="txSubmitBtn" class="btn" type="submit">Record</button>
               <button id="cancelTxEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
-              <button id="exportCsvBtn" class="btn btn-secondary" type="button" title="Export filtered transactions to CSV">Export CSV</button>
             </div>
           </form>
+        </section>
 
-          <div class="divider"></div>
-          <div id="quickRepeatSection" hidden>
-            <div class="row">
-              <h3 class="h3">⚡ Quick repeat</h3>
-              <div class="muted small">Re-enter a recent record in one click.</div>
-            </div>
-            <div id="quickRepeatList" class="quick-repeat-list"></div>
-            <div class="divider" style="margin-top:14px"></div>
-          </div>
+        <!-- VIEW: Record List -->
+        <section class="card stack view-section" data-view="records" aria-label="Record List">
           <div class="row">
-            <h3 class="h3">Search notes</h3>
-            <div class="muted small">Type a word like “eat” to filter notes.</div>
+            <h2>📝 Record List</h2>
+            <div class="muted small">Browse and search your transactions.</div>
+          </div>
+
+          <div class="row">
+            <h3 class="h3">🔍 Search notes</h3>
+            <div class="muted small">Type a word like "eat" to filter notes.</div>
           </div>
           <div class="row">
             <input id="searchInput" class="search" type="search" placeholder="Search note text…" />
@@ -223,94 +197,160 @@
               <button id="txNextBtn" class="btn btn-secondary" type="button">Next</button>
             </div>
           </div>
+
+          <div class="row wrap">
+            <button id="exportCsvBtn" class="btn btn-secondary" type="button" title="Export filtered transactions to CSV">Export CSV</button>
+          </div>
         </section>
-      </section>
 
-      <section class="card stack" aria-label="Statistics">
-        <div class="row">
-          <h2>Statistics</h2>
-          <div class="muted small">Weekly / Monthly / Yearly totals.</div>
-        </div>
-
-        <div class="row wrap">
-          <label class="field inline">
-            <span>Range</span>
-            <select id="statsRange">
-              <option value="week">Weekly</option>
-              <option value="month" selected>Monthly</option>
-              <option value="year">Yearly</option>
-            </select>
-          </label>
-          <label id="statsDateField" class="field inline" hidden>
-            <span>Date</span>
-            <input id="statsAnchorDate" type="date" required />
-          </label>
-          <label id="statsMonthField" class="field inline">
-            <span>Month</span>
-            <input id="statsMonth" type="month" required />
-          </label>
-          <label id="statsYearField" class="field inline" hidden>
-            <span>Year</span>
-            <select id="statsYear" required></select>
-          </label>
-          <button id="refreshStatsBtn" class="btn btn-secondary" type="button" style="margin-top:20px">Refresh</button>
-          <div id="statsRangeLabel" class="muted small full"></div>
-        </div>
-
-        <div class="grid-3">
-          <div class="stat">
-            <div class="muted small">Total Expense</div>
-            <div id="totalExpense" class="stat-value">0.00</div>
-            <div id="expenseTrend" class="trend-label muted small"></div>
+        <!-- VIEW: Budget -->
+        <section class="card stack view-section" data-view="budget" aria-label="Categories & Budgets">
+          <div class="row">
+            <h2>🏦 Categories & Budgets</h2>
+            <div class="muted small">Add a category and set its budget.</div>
           </div>
-          <div class="stat">
-            <div class="muted small">Total Revenue</div>
-            <div id="totalRevenue" class="stat-value">0.00</div>
-            <div id="revenueTrend" class="trend-label muted small"></div>
-          </div>
-          <div class="stat">
-            <div class="muted small">Net</div>
-            <div id="netTotal" class="stat-value">0.00</div>
-          </div>
-        </div>
 
-        <div id="projectionRow" class="grid-3" hidden>
-          <div class="stat">
-            <div class="muted small">Daily Avg Expense</div>
-            <div id="dailyAvgExpense" class="stat-value small">—</div>
+          <form id="categoryForm" class="stack-compact" autocomplete="off">
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Name</span>
+                <input id="categoryName" type="text" placeholder="e.g., Food" required maxlength="32" />
+              </label>
+              <label class="field inline-sm">
+                <span>Budget</span>
+                <input id="categoryBudget" type="number" placeholder="0" min="0" step="0.01" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Period</span>
+                <select id="categoryPeriod" required>
+                  <option value="month" selected>Monthly</option>
+                  <option value="year">Yearly</option>
+                  <option value="lifetime">Lifetime</option>
+                </select>
+              </label>
+            </div>
+            <div class="row">
+              <button id="categorySubmitBtn" class="btn" type="submit">Add category</button>
+              <button id="cancelCategoryEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
+              <div class="muted small">Tip: Budget = 0 means no limit.</div>
+            </div>
+          </form>
+
+          <div class="divider-thin"></div>
+
+          <div class="compact-row">
+            <label class="field inline-sm">
+              <span>Budget month</span>
+              <input id="budgetMonth" type="month" required />
+            </label>
+            <div id="budgetScope" class="muted small"></div>
           </div>
-          <div class="stat">
-            <div class="muted small">Projected Month Total</div>
-            <div id="projectedExpense" class="stat-value small">—</div>
+
+          <div class="collapsible-section collapsed">
+          <div class="collapsible-toggle" role="button" tabindex="0" aria-expanded="false" data-label="Budget List" data-icon="📋">
+            <span class="collapsible-label">📋 Budget List</span>
+            <span class="collapse-chevron" aria-hidden="true">▸</span>
           </div>
-          <div class="stat">
-            <div class="muted small">Days Left</div>
-            <div id="daysLeft" class="stat-value small">—</div>
+          <div class="budget-list-wrap collapsible-body">
+            <div class="table-wrap">
+              <table class="table budget-table" aria-label="Category table">
+                <thead class="sr-only">
+                  <tr>
+                    <th>Name</th>
+                    <th>Period</th>
+                    <th class="right">Budget</th>
+                    <th class="right">Spent</th>
+                    <th class="right">Income</th>
+                    <th class="right">Balance</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="categoryTbody"></tbody>
+              </table>
+            </div>
           </div>
-        </div>
+          </div>
+        </section>
 
-        <div class="chart-wrap" aria-label="Statistics chart">
-          <div id="statsChartMessage" class="muted small" hidden></div>
-          <canvas id="statsChart" height="140"></canvas>
-        </div>
+        <!-- VIEW: Statistics -->
+        <section class="card stack view-section stats-view" data-view="stats" aria-label="Statistics">
 
-        <div class="divider"></div>
+          <div class="stats-header">
+            <h2>Statistics</h2>
+            <div class="stats-controls">
+              <select id="statsRange" class="stats-range-select">
+                <option value="week">Weekly</option>
+                <option value="month" selected>Monthly</option>
+                <option value="year">Yearly</option>
+              </select>
+              <label id="statsDateField" class="field inline-sm" hidden>
+                <input id="statsAnchorDate" type="date" required />
+              </label>
+              <label id="statsMonthField" class="field inline-sm">
+                <input id="statsMonth" type="month" required />
+              </label>
+              <label id="statsYearField" class="field inline-sm" hidden>
+                <select id="statsYear" required></select>
+              </label>
+              <button id="refreshStatsBtn" class="btn btn-secondary btn-small" type="button">Refresh</button>
+            </div>
+            <div id="statsRangeLabel" class="muted small"></div>
+          </div>
 
-        <div class="table-wrap">
-          <table class="table" aria-label="Stats by category">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th class="right">Expense</th>
-                <th class="right">Revenue</th>
-                <th class="right">Net</th>
-              </tr>
-            </thead>
-            <tbody id="statsTbody"></tbody>
-          </table>
-        </div>
-      </section>
+          <div class="stats-summary">
+            <div class="stat-card stat-expense">
+              <div class="stat-icon">📉</div>
+              <div class="stat-info">
+                <div class="stat-label">Total Expense</div>
+                <div id="totalExpense" class="stat-value">0.00</div>
+                <div id="expenseTrend" class="trend-label muted small"></div>
+              </div>
+            </div>
+            <div class="stat-card stat-revenue">
+              <div class="stat-icon">📈</div>
+              <div class="stat-info">
+                <div class="stat-label">Total Revenue</div>
+                <div id="totalRevenue" class="stat-value">0.00</div>
+                <div id="revenueTrend" class="trend-label muted small"></div>
+              </div>
+            </div>
+            <div class="stat-card stat-net">
+              <div class="stat-icon">💎</div>
+              <div class="stat-info">
+                <div class="stat-label">Net</div>
+                <div id="netTotal" class="stat-value">0.00</div>
+              </div>
+            </div>
+          </div>
 
+          <div id="projectionRow" class="stats-projection" hidden>
+            <div class="projection-item">
+              <span class="projection-label">⚡ Daily Avg</span>
+              <span id="dailyAvgExpense" class="projection-val">—</span>
+            </div>
+            <div class="projection-item">
+              <span class="projection-label">📅 Projected</span>
+              <span id="projectedExpense" class="projection-val">—</span>
+            </div>
+            <div class="projection-item">
+              <span class="projection-label">⏳ Days Left</span>
+              <span id="daysLeft" class="projection-val">—</span>
+            </div>
+          </div>
+
+          <div class="stats-chart-card" aria-label="Statistics chart">
+            <div id="statsChartMessage" class="muted small" hidden></div>
+            <canvas id="statsChart" height="140"></canvas>
+          </div>
+
+          <div class="stats-breakdown">
+            <h3 class="stats-breakdown-title">Category Breakdown</h3>
+            <div id="statsTbody" class="stats-category-grid"></div>
+          </div>
+
+        </section>
+
+      </div> <!-- .view-container -->
       </div>
     </main>
 
@@ -333,6 +373,17 @@
       </div>
     </div>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=2"></script>
+    <script>
+      // Desktop sidebar close – inline fallback
+      document.addEventListener("DOMContentLoaded", () => {
+        const closeBtn = document.getElementById("closeSidebar");
+        if (closeBtn) {
+          closeBtn.addEventListener("click", () => {
+            document.body.classList.add("sidebar-collapsed");
+          });
+        }
+      });
+    </script>
   </body>
 </html>

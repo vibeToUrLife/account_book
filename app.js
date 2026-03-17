@@ -78,8 +78,8 @@ const els = {
   todayBtn: document.getElementById("todayBtn"),
   noteSuggestions: document.getElementById("noteSuggestions"),
   duplicateWarning: document.getElementById("duplicateWarning"),
-  quickRepeatSection: document.getElementById("quickRepeatSection"),
-  quickRepeatList: document.getElementById("quickRepeatList"),
+  quickRepeatSection: null,
+  quickRepeatList: null,
   expenseTrend: document.getElementById("expenseTrend"),
   revenueTrend: document.getElementById("revenueTrend"),
   projectionRow: document.getElementById("projectionRow"),
@@ -350,7 +350,8 @@ async function renderStatsChart(range, start, endExclusive) {
   const getCatName = (id) => {
     if (id === "uncategorized") return "Uncategorized";
     const c = categories.find((cat) => cat.id === id);
-    return c ? c.name : "Unknown";
+    if (!c) return null; // deleted category – skip
+    return c.name || "Unnamed";
   };
 
   // Sort categories by amount desc
@@ -358,7 +359,13 @@ async function renderStatsChart(range, start, endExclusive) {
     (a, b) => categoryTotals[b] - categoryTotals[a]
   );
 
-  if (sortedCatIds.length === 0 || totalExpense <= 0) {
+  // Filter out deleted categories and zero amounts
+  const validCatIds = sortedCatIds.filter((id) => {
+    const name = getCatName(id);
+    return name !== null && categoryTotals[id] > 0;
+  });
+
+  if (validCatIds.length === 0 || totalExpense <= 0) {
     if (statsChartInstance) {
       statsChartInstance.destroy();
       statsChartInstance = null;
@@ -395,7 +402,7 @@ async function renderStatsChart(range, start, endExclusive) {
   const baseColors = [primary, danger, warning];
   const alphaSteps = [0.85, 0.65, 0.5, 0.35];
 
-  sortedCatIds.forEach((id, index) => {
+  validCatIds.forEach((id, index) => {
     labels.push(getCatName(id));
     dataPoints.push(Math.round(categoryTotals[id] * 100) / 100);
     const base = baseColors[index % baseColors.length];
@@ -426,8 +433,8 @@ async function renderStatsChart(range, start, endExclusive) {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: "right",
-        labels: { color: text },
+        position: "bottom",
+        labels: { color: text, padding: 12, usePointStyle: true, pointStyle: "circle" },
       },
       tooltip: {
         callbacks: {
@@ -826,43 +833,72 @@ function renderCategoriesTable() {
       period,
       period === "month" ? monthRefDate : period === "year" ? yearRefDate : null
     );
-    const effectiveBudgetBalance = (c.budget || 0) + balance; // budget + revenue - expense
+    const effectiveBudgetBalance = (c.budget || 0) + balance;
 
     const periodLabel =
       period === "month"
-        ? `Monthly (${monthLabel})`
+        ? `Monthly`
         : period === "year"
-          ? `Yearly (${yearLabel})`
+          ? `Yearly`
           : "Lifetime";
 
-    const budgetUsedPct = (c.budget || 0) > 0 ? (spent / (c.budget || 1)) * 100 : 0;
-    let budgetBadge = '';
-    let budgetRowClass = 'budget-ok';
+    const budgetUsedPct = (c.budget || 0) > 0 ? Math.min((spent / (c.budget || 1)) * 100, 100) : 0;
+    let statusClass = 'budget-ok';
+    let statusLabel = '';
     if ((c.budget || 0) > 0 && spent > 0) {
       if (budgetUsedPct >= 100) {
-        budgetBadge = '<span class="budget-badge over">OVER</span>';
-        budgetRowClass = 'budget-over';
+        statusClass = 'budget-over';
+        statusLabel = '<span class="budget-badge over">OVER BUDGET</span>';
       } else if (budgetUsedPct >= 80) {
-        budgetBadge = `<span class="budget-badge warn">${Math.round(budgetUsedPct)}%</span>`;
-        budgetRowClass = 'budget-warn';
+        statusClass = 'budget-warn';
+        statusLabel = `<span class="budget-badge warn">${Math.round(budgetUsedPct)}% used</span>`;
       }
     }
 
+    const hasBudget = (c.budget || 0) > 0;
+    const progressColor = budgetUsedPct >= 100 ? 'var(--danger)' : budgetUsedPct >= 80 ? 'var(--warning)' : 'var(--primary)';
+    const pctDisplay = hasBudget ? Math.round(budgetUsedPct) : 0;
+    const net = income - spent;
+
     const tr = document.createElement("tr");
     tr.dataset.categoryId = c.id;
-    tr.classList.add("clickable-row", budgetRowClass);
+    tr.classList.add("clickable-row", statusClass, "budget-card-row");
     if (c.id === activeCategoryId) tr.classList.add("selected");
+
+    const progressHtml = hasBudget ? `
+          <div class="budget-progress-wrap">
+            <div class="budget-progress-bar">
+              <div class="budget-progress-fill" style="width:${pctDisplay}%;background:${progressColor}"></div>
+            </div>
+            <div class="budget-progress-label">${pctDisplay}%</div>
+          </div>` : '';
+
+    const statsHtml = hasBudget ? `
+          <div class="budget-card-stats">
+            <div class="budget-stat"><span class="budget-stat-label">Budget</span><span class="budget-stat-val">${money(c.budget)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">Spent</span><span class="budget-stat-val val-negative">${money(spent)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">Income</span><span class="budget-stat-val val-positive">${money(income)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">Balance</span><span class="budget-stat-val ${effectiveBudgetBalance > 0 ? 'val-positive' : effectiveBudgetBalance < 0 ? 'val-negative' : ''}">${money(effectiveBudgetBalance)}</span></div>
+          </div>` : `
+          <div class="budget-card-stats budget-card-stats-3">
+            <div class="budget-stat"><span class="budget-stat-label">Spent</span><span class="budget-stat-val val-negative">${money(spent)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">Income</span><span class="budget-stat-val val-positive">${money(income)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">Net</span><span class="budget-stat-val ${net > 0 ? 'val-positive' : net < 0 ? 'val-negative' : ''}">${money(net)}</span></div>
+          </div>`;
+
     tr.innerHTML = `
-      <td data-label="Name">${escapeHtml(c.name)}${budgetBadge}</td>
-      <td data-label="Period">${escapeHtml(periodLabel)}</td>
-      <td class="right" data-label="Budget">${money(c.budget || 0)}</td>
-      <td class="right" data-label="Spent">${money(spent)}</td>
-      <td class="right" data-label="Income">${money(income)}</td>
-      <td class="right ${effectiveBudgetBalance > 0 ? 'val-positive' : effectiveBudgetBalance < 0 ? 'val-negative' : ''}" data-label="Balance">${money(effectiveBudgetBalance)}</td>
-      <td>
-        <div class="row-actions">
-          <button class="btn btn-small" type="button" data-action="edit-category" data-id="${c.id}">Edit</button>
-          <button class="btn btn-danger btn-small" type="button" data-action="delete-category" data-id="${c.id}">Delete</button>
+      <td colspan="7" class="budget-card-cell">
+        <div class="budget-card-inner">
+          <div class="budget-card-top">
+            <div class="budget-card-name">${escapeHtml(c.name)} ${statusLabel}${!hasBudget ? '<span class="budget-badge no-limit">NO LIMIT</span>' : ''}</div>
+            <div class="budget-card-period">${escapeHtml(periodLabel)}</div>
+          </div>
+          ${progressHtml}
+          ${statsHtml}
+          <div class="budget-card-actions">
+            <button class="btn btn-small" type="button" data-action="edit-category" data-id="${c.id}">Edit</button>
+            <button class="btn btn-danger btn-small" type="button" data-action="delete-category" data-id="${c.id}">Delete</button>
+          </div>
         </div>
       </td>
     `;
@@ -871,6 +907,11 @@ function renderCategoriesTable() {
 }
 
 function renderTransactionsTable() {
+  /* Preserve min-height to prevent scroll jump when content changes */
+  const tableWrap = els.txTbody.closest(".table-wrap");
+  if (tableWrap) {
+    tableWrap.style.minHeight = tableWrap.offsetHeight + "px";
+  }
   els.txTbody.innerHTML = "";
 
   const term = searchTerm.trim().toLowerCase();
@@ -921,6 +962,7 @@ function renderTransactionsTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="6" class="muted">No records found.</td>`;
     els.txTbody.appendChild(tr);
+    if (tableWrap) requestAnimationFrame(() => { tableWrap.style.minHeight = ""; });
     return;
   }
 
@@ -944,6 +986,11 @@ function renderTransactionsTable() {
       </td>
     `;
     els.txTbody.appendChild(tr);
+  }
+
+  /* Release min-height constraint after content is rendered */
+  if (tableWrap) {
+    requestAnimationFrame(() => { tableWrap.style.minHeight = ""; });
   }
 }
 
@@ -1000,22 +1047,25 @@ function renderStats() {
   });
 
   if (rows.length === 0) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="4" class="muted">No records in this range.</td>`;
-    els.statsTbody.appendChild(tr);
+    els.statsTbody.innerHTML = `<div class="muted small">No records in this range.</div>`;
     return;
   }
 
-  for (const r of rows) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td data-label="Category">${escapeHtml(r.categoryName)}</td>
-      <td class="right" data-label="Expense">${money(r.expense)}</td>
-      <td class="right" data-label="Revenue">${money(r.revenue)}</td>
-      <td class="right ${(r.revenue - r.expense) > 0 ? 'val-positive' : (r.revenue - r.expense) < 0 ? 'val-negative' : ''}" data-label="Net">${money(r.revenue - r.expense)}</td>
+  // Color palette for dots
+  const dotColors = ["#7c5cfc", "#ef4444", "#f59e0b", "#22c55e", "#06b6d4", "#ec4899", "#8b5cf6", "#14b8a6"];
+
+  rows.forEach((r, i) => {
+    const dotColor = dotColors[i % dotColors.length];
+    const netVal = r.revenue - r.expense;
+    const chip = document.createElement("div");
+    chip.className = "stats-cat-chip";
+    chip.innerHTML = `
+      <span class="cat-dot" style="background:${dotColor}"></span>
+      <span class="cat-chip-name">${escapeHtml(r.categoryName)}</span>
+      <span class="cat-chip-amount">${money(r.expense)}</span>
     `;
-    els.statsTbody.appendChild(tr);
-  }
+    els.statsTbody.appendChild(chip);
+  });
 }
 
 let renderAllPending = false;
@@ -1335,44 +1385,8 @@ function updateNoteSuggestions() {
 }
 
 function renderQuickRepeat() {
-  if (!els.quickRepeatSection || !els.quickRepeatList) return;
-  // Show up to 3 most recent unique transactions (by cat+type+amount+note)
-  const seen = new Set();
-  const items = [];
-  const sorted = transactions.slice().sort((a, b) => {
-    const da = a.dateISO || "";
-    const db = b.dateISO || "";
-    return db.localeCompare(da);
-  });
-  for (const tx of sorted) {
-    const key = `${tx.categoryId}|${tx.type}|${tx.amount}|${(tx.note || "").toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    items.push(tx);
-    if (items.length >= 3) break;
-  }
-  if (items.length === 0) {
-    els.quickRepeatSection.hidden = true;
-    return;
-  }
-  els.quickRepeatSection.hidden = false;
-  els.quickRepeatList.innerHTML = "";
-  for (const tx of items) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "quick-chip";
-    const typeIcon = tx.type === "expense" ? "−" : "+";
-    chip.innerHTML = `<span class="chip-cat">${escapeHtml(tx.categoryName || "")}</span> <span class="chip-amount">${typeIcon}${money(tx.amount)}</span> ${tx.note ? escapeHtml(tx.note) : ''}`;
-    chip.addEventListener("click", () => {
-      els.txCategory.value = tx.categoryId || "";
-      els.txType.value = tx.type || "expense";
-      els.txAmount.value = String(tx.amount);
-      els.txNote.value = tx.note || "";
-      els.txDate.value = todayISO();
-      els.txAmount.focus();
-    });
-    els.quickRepeatList.appendChild(chip);
-  }
+  /* Quick repeat removed */
+  return;
 }
 
 function computeTrend(range, start, endExclusive) {
@@ -2200,7 +2214,147 @@ function checkDuplicate() {
   els.duplicateWarning.hidden = !isDup;
 }
 
+/** Scroll to top of the page for pagination UX */
+function scrollToRecordList() {
+  if (window.scrollY < 10) return; /* Already at top, skip */
+  setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, 50);
+}
+
 function wireEvents() {
+  /* -- Sidebar navigation -- */
+  const menuBtn = document.getElementById("menuBtn");
+  const sidebar = document.getElementById("sidebar");
+  const sidebarOverlay = document.getElementById("sidebarOverlay");
+  const closeSidebarBtn = document.getElementById("closeSidebar");
+  const sidebarItems = document.querySelectorAll(".sidebar-item");
+  const viewSections = document.querySelectorAll(".view-section");
+
+  function openSidebar() {
+    if (window.innerWidth >= 980) {
+      /* Desktop: toggle collapsed state */
+      document.body.classList.toggle("sidebar-collapsed");
+      return;
+    }
+    sidebar.classList.add("open");
+    sidebarOverlay.classList.add("open");
+    sidebarOverlay.hidden = false;
+  }
+
+  function closeSidebar() {
+    if (window.innerWidth >= 980) {
+      /* Desktop: collapse sidebar */
+      document.body.classList.add("sidebar-collapsed");
+      return;
+    }
+    sidebar.classList.remove("open");
+    sidebarOverlay.classList.remove("open");
+    setTimeout(() => { sidebarOverlay.hidden = true; }, 300);
+  }
+
+  function switchView(viewName) {
+    viewSections.forEach((s) => {
+      s.classList.toggle("active", s.dataset.view === viewName);
+    });
+    sidebarItems.forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.view === viewName);
+    });
+    /* Close sidebar after navigation on all screen sizes */
+    if (window.innerWidth < 980) {
+      closeSidebar();
+    } else {
+      document.body.classList.add("sidebar-collapsed");
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  if (menuBtn) menuBtn.addEventListener("click", openSidebar);
+  if (closeSidebarBtn) {
+    closeSidebarBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeSidebar();
+    });
+  }
+  if (sidebarOverlay) sidebarOverlay.addEventListener("click", closeSidebar);
+
+  sidebarItems.forEach((item) => {
+    item.addEventListener("click", () => switchView(item.dataset.view));
+  });
+
+  /* Activate the default view */
+  switchView("record");
+
+  /* -- Collapsible sections on mobile -- */
+  document.querySelectorAll(".collapsible-toggle").forEach((toggle) => {
+    const section = toggle.closest(".collapsible-section");
+    if (!section) return;
+    const body = section.querySelector(".collapsible-body");
+    const chevron = toggle.querySelector(".collapse-chevron");
+
+    const setCollapsed = (collapsed) => {
+      if (collapsed) {
+        section.classList.add("collapsed");
+        toggle.setAttribute("aria-expanded", "false");
+        if (chevron) chevron.textContent = "▸";
+      } else {
+        /* Preserve scroll position so page doesn't jump */
+        const prevTop = toggle.getBoundingClientRect().top;
+        section.classList.remove("collapsed");
+        toggle.setAttribute("aria-expanded", "true");
+        if (chevron) chevron.textContent = "▾";
+        /* Restore toggle to same visual position */
+        const newTop = toggle.getBoundingClientRect().top;
+        if (Math.abs(newTop - prevTop) > 2) {
+          window.scrollBy(0, newTop - prevTop);
+        }
+      }
+    };
+
+    const doToggle = () => {
+      setCollapsed(!section.classList.contains("collapsed"));
+    };
+
+    toggle.addEventListener("click", doToggle);
+    toggle.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); doToggle(); }
+    });
+
+    /* Swipe gesture: down to expand, up to collapse */
+    let touchStartY = 0;
+    section.addEventListener("touchstart", (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    section.addEventListener("touchend", (e) => {
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dy) < 40) return; /* ignore small moves */
+      if (dy > 0 && section.classList.contains("collapsed")) setCollapsed(false);
+      if (dy < 0 && !section.classList.contains("collapsed")) setCollapsed(true);
+    }, { passive: true });
+
+    /* Re-measure when content changes (e.g. new records) */
+    if (body) {
+      const observer = new MutationObserver(() => {
+        /* Update item count badge */
+        updateCollapsibleCount(toggle, section);
+      });
+      observer.observe(body, { childList: true, subtree: true });
+    }
+  });
+
+  /* Helper: update the count badge on a collapsible toggle */
+  function updateCollapsibleCount(toggle, section) {
+    const labelEl = toggle.querySelector(".collapsible-label");
+    if (!labelEl) return;
+    const icon = toggle.dataset.icon || "";
+    const label = toggle.dataset.label || "";
+    const rows = section.querySelectorAll(".collapsible-body tbody tr");
+    /* Don't count empty-state rows */
+    const count = Array.from(rows).filter(r => !r.querySelector("td.muted")).length;
+    const countBadge = count > 0 ? `<span class="collapsible-count">${count}</span>` : "";
+    labelEl.innerHTML = `${icon} ${label} ${countBadge}`;
+  }
+
   if (els.themeToggleBtn) {
     els.themeToggleBtn.addEventListener("click", () => {
       const current = document.documentElement.dataset.theme;
@@ -2440,6 +2594,7 @@ function wireEvents() {
     els.txPrevBtn.addEventListener("click", () => {
       txPage = Math.max(1, txPage - 1);
       renderTransactionsTable();
+      scrollToRecordList();
     });
   }
 
@@ -2447,6 +2602,7 @@ function wireEvents() {
     els.txNextBtn.addEventListener("click", () => {
       txPage = txPage + 1;
       renderTransactionsTable();
+      scrollToRecordList();
     });
   }
 
