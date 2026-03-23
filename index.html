@@ -48,6 +48,10 @@
           <span class="sidebar-icon">📊</span>
           <span>Statistics</span>
         </button>
+        <button class="sidebar-item" data-view="insights" type="button">
+          <span class="sidebar-icon">🧠</span>
+          <span>Insights</span>
+        </button>
       </div>
     </nav>
 
@@ -137,6 +141,7 @@
               <span>Note</span>
               <input id="txNote" type="text" placeholder="e.g., eat" maxlength="80" list="noteSuggestions" />
               <datalist id="noteSuggestions"></datalist>
+              <div id="autoCategorySuggestion" class="auto-cat-hint small" hidden></div>
             </label>
 
             <div id="duplicateWarning" class="callout callout-warning small" hidden role="alert">
@@ -154,6 +159,7 @@
             <div class="row wrap">
               <button id="txSubmitBtn" class="btn" type="submit">Record</button>
               <button id="cancelTxEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
+              <button id="scanReceiptBtn" class="btn btn-secondary" type="button" title="Scan a receipt with camera">📷 Scan Receipt</button>
             </div>
           </form>
         </section>
@@ -344,6 +350,18 @@
 
         </section>
 
+        <!-- VIEW: Insights -->
+        <section class="card stack view-section" data-view="insights" aria-label="Spending Insights">
+          <div class="row">
+            <h2>🧠 Spending Insights</h2>
+            <button id="refreshInsightsBtn" class="btn btn-secondary btn-small" type="button">Refresh</button>
+          </div>
+          <div class="muted small">Auto-generated summary of your spending patterns.</div>
+          <div id="insightsContent" class="insights-content">
+            <div class="muted">Add some records to see insights.</div>
+          </div>
+        </section>
+
       </div> <!-- .view-container -->
       </div>
 
@@ -385,6 +403,42 @@
               <button id="editTxCancelBtn" class="btn btn-secondary" type="button">Cancel</button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- Receipt Scan Modal -->
+      <div id="receiptModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal" role="dialog" aria-modal="true" aria-label="Scan Receipt">
+          <div class="edit-modal-header">
+            <h3>📷 Scan Receipt</h3>
+            <button id="closeReceiptModal" class="btn btn-secondary btn-small" type="button">✕</button>
+          </div>
+          <div class="receipt-scan-body">
+            <p class="muted small">Take a photo or upload a receipt image. We'll extract the amount and text automatically.</p>
+            <div class="receipt-capture-area">
+              <video id="receiptVideo" class="receipt-video" autoplay playsinline hidden></video>
+              <canvas id="receiptCanvas" hidden></canvas>
+              <img id="receiptPreview" class="receipt-preview" hidden alt="Receipt preview" />
+            </div>
+            <div class="row wrap" style="gap:8px; margin-top:12px;">
+              <button id="receiptCameraBtn" class="btn btn-secondary" type="button">📸 Use Camera</button>
+              <label class="btn btn-secondary" style="cursor:pointer;">
+                📁 Upload Image
+                <input id="receiptFileInput" type="file" accept="image/*" hidden />
+              </label>
+              <button id="receiptCaptureBtn" class="btn" type="button" hidden>📷 Capture</button>
+            </div>
+            <div id="receiptStatus" class="muted small" style="margin-top:8px;"></div>
+            <div id="receiptResult" class="receipt-result" hidden>
+              <div class="receipt-result-header">Extracted Data:</div>
+              <div class="receipt-result-row"><strong>Amount:</strong> <span id="receiptAmountResult">—</span></div>
+              <div class="receipt-result-row"><strong>Text:</strong> <span id="receiptTextResult">—</span></div>
+              <div class="row wrap" style="gap:8px; margin-top:12px;">
+                <button id="receiptApplyBtn" class="btn" type="button">Apply to Form</button>
+                <button id="receiptRetryBtn" class="btn btn-secondary" type="button">Try Again</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

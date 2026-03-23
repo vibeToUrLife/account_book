@@ -121,6 +121,25 @@ const els = {
   editTxSaveBtn: document.getElementById("editTxSaveBtn"),
   editTxCancelBtn: document.getElementById("editTxCancelBtn"),
   closeEditModal: document.getElementById("closeEditModal"),
+
+  autoCategorySuggestion: document.getElementById("autoCategorySuggestion"),
+  scanReceiptBtn: document.getElementById("scanReceiptBtn"),
+  receiptModal: document.getElementById("receiptModal"),
+  closeReceiptModal: document.getElementById("closeReceiptModal"),
+  receiptVideo: document.getElementById("receiptVideo"),
+  receiptCanvas: document.getElementById("receiptCanvas"),
+  receiptPreview: document.getElementById("receiptPreview"),
+  receiptCameraBtn: document.getElementById("receiptCameraBtn"),
+  receiptFileInput: document.getElementById("receiptFileInput"),
+  receiptCaptureBtn: document.getElementById("receiptCaptureBtn"),
+  receiptStatus: document.getElementById("receiptStatus"),
+  receiptResult: document.getElementById("receiptResult"),
+  receiptAmountResult: document.getElementById("receiptAmountResult"),
+  receiptTextResult: document.getElementById("receiptTextResult"),
+  receiptApplyBtn: document.getElementById("receiptApplyBtn"),
+  receiptRetryBtn: document.getElementById("receiptRetryBtn"),
+  insightsContent: document.getElementById("insightsContent"),
+  refreshInsightsBtn: document.getElementById("refreshInsightsBtn"),
 };
 
 let ChartJs = null;
@@ -2263,8 +2282,16 @@ function wireAssistantEvents() {
   }
   // Escape closes the panel
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && els.assistantPanel && !els.assistantPanel.hidden) {
-      toggleAssistantPanel(false);
+    if (e.key === "Escape") {
+      if (els.assistantPanel && !els.assistantPanel.hidden) {
+        toggleAssistantPanel(false);
+      }
+      if (els.editTxModal && !els.editTxModal.hidden) {
+        closeEditModal();
+      }
+      if (els.receiptModal && !els.receiptModal.hidden) {
+        closeReceiptModal();
+      }
     }
   });
 }
@@ -2282,6 +2309,343 @@ function checkDuplicate() {
     (t) => t.categoryId === categoryId && t.amount === amount && t.dateISO === dateISO && t.id !== editingTransactionId
   );
   els.duplicateWarning.hidden = !isDup;
+}
+
+/* ─── Smart Auto-Categorization ─── */
+function suggestCategoryFromNote(noteText) {
+  const text = (noteText || "").trim().toLowerCase();
+  if (!text || text.length < 2) return null;
+
+  // Build frequency map: for each category, count how many past transactions have similar notes
+  const scores = new Map();
+  for (const tx of transactions) {
+    const txNote = (tx.note || "").toLowerCase();
+    if (!txNote) continue;
+    // Check if the note text overlaps with the current input
+    if (txNote.includes(text) || text.includes(txNote)) {
+      const catId = tx.categoryId;
+      scores.set(catId, (scores.get(catId) || 0) + 2); // exact-ish match
+    } else {
+      // Word-level overlap
+      const inputWords = text.split(/\s+/);
+      const noteWords = txNote.split(/\s+/);
+      const overlap = inputWords.filter((w) => w.length >= 2 && noteWords.some((nw) => nw.includes(w) || w.includes(nw)));
+      if (overlap.length > 0) {
+        const catId = tx.categoryId;
+        scores.set(catId, (scores.get(catId) || 0) + overlap.length);
+      }
+    }
+  }
+
+  if (scores.size === 0) return null;
+
+  // Pick the category with the highest score
+  let bestId = null;
+  let bestScore = 0;
+  for (const [catId, score] of scores) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestId = catId;
+    }
+  }
+  if (!bestId) return null;
+  const cat = categories.find((c) => c.id === bestId);
+  return cat ? { id: cat.id, name: cat.name, score: bestScore } : null;
+}
+
+function updateAutoCategorySuggestion() {
+  if (!els.autoCategorySuggestion) return;
+  const noteText = els.txNote.value;
+  const currentCat = els.txCategory.value;
+  const suggestion = suggestCategoryFromNote(noteText);
+
+  if (!suggestion || suggestion.id === currentCat) {
+    els.autoCategorySuggestion.hidden = true;
+    return;
+  }
+
+  els.autoCategorySuggestion.textContent = `💡 Suggest: ${suggestion.name} (click to apply)`;
+  els.autoCategorySuggestion.hidden = false;
+  els.autoCategorySuggestion.onclick = () => {
+    els.txCategory.value = suggestion.id;
+    els.autoCategorySuggestion.hidden = true;
+  };
+}
+
+/* ─── Spending Insights ─── */
+function generateInsights() {
+  if (!els.insightsContent) return;
+  if (transactions.length === 0) {
+    els.insightsContent.innerHTML = '<div class="muted">Add some records to see insights.</div>';
+    return;
+  }
+
+  const now = new Date();
+  const thisMonth = currentMonthValue(now);
+  const lastMonth = currentMonthValue(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+  // Current month transactions
+  const curMonthTxs = transactions.filter((t) => t.dateISO && t.dateISO.substring(0, 7) === thisMonth);
+  const prevMonthTxs = transactions.filter((t) => t.dateISO && t.dateISO.substring(0, 7) === lastMonth);
+
+  let curExpense = 0, curRevenue = 0, prevExpense = 0, prevRevenue = 0;
+  const catSpend = new Map();
+
+  for (const tx of curMonthTxs) {
+    if (tx.type === "expense") {
+      curExpense += tx.amount;
+      catSpend.set(tx.categoryName || "(Unknown)", (catSpend.get(tx.categoryName || "(Unknown)") || 0) + tx.amount);
+    } else {
+      curRevenue += tx.amount;
+    }
+  }
+  for (const tx of prevMonthTxs) {
+    if (tx.type === "expense") prevExpense += tx.amount;
+    else prevRevenue += tx.amount;
+  }
+
+  const cards = [];
+
+  // 1. Monthly Overview
+  const netCur = curRevenue - curExpense;
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const dailyAvg = dayOfMonth > 0 ? curExpense / dayOfMonth : 0;
+  const projected = dailyAvg * daysInMonth;
+
+  cards.push(`<div class="insight-card">
+    <h4>📊 This Month Overview</h4>
+    <ul>
+      <li>Total Expense: <span class="insight-warn">${money(curExpense)}</span></li>
+      <li>Total Revenue: <span class="insight-good">${money(curRevenue)}</span></li>
+      <li>Net: <span class="${netCur >= 0 ? 'insight-good' : 'insight-warn'}">${money(netCur)}</span></li>
+      <li>Daily Average Spending: <span class="insight-highlight">${money(dailyAvg)}</span></li>
+      <li>Projected Month-End Expense: <span class="insight-highlight">${money(projected)}</span></li>
+    </ul>
+  </div>`);
+
+  // 2. Month-over-month comparison
+  if (prevExpense > 0 || prevRevenue > 0) {
+    const expChange = prevExpense > 0 ? ((curExpense - prevExpense) / prevExpense * 100) : 0;
+    const revChange = prevRevenue > 0 ? ((curRevenue - prevRevenue) / prevRevenue * 100) : 0;
+    const expArrow = expChange > 0 ? "↑" : expChange < 0 ? "↓" : "→";
+    const revArrow = revChange > 0 ? "↑" : revChange < 0 ? "↓" : "→";
+
+    cards.push(`<div class="insight-card">
+      <h4>📈 vs Last Month</h4>
+      <ul>
+        <li>Expenses: ${expArrow} <span class="${expChange > 0 ? 'insight-warn' : 'insight-good'}">${Math.abs(expChange).toFixed(1)}% ${expChange > 0 ? 'more' : 'less'}</span> (was ${money(prevExpense)})</li>
+        <li>Revenue: ${revArrow} <span class="${revChange >= 0 ? 'insight-good' : 'insight-warn'}">${Math.abs(revChange).toFixed(1)}% ${revChange >= 0 ? 'more' : 'less'}</span> (was ${money(prevRevenue)})</li>
+      </ul>
+    </div>`);
+  }
+
+  // 3. Top spending categories
+  if (catSpend.size > 0) {
+    const sorted = [...catSpend.entries()].sort((a, b) => b[1] - a[1]);
+    const top5 = sorted.slice(0, 5);
+    const topItems = top5.map(([name, amount], i) => {
+      const pct = curExpense > 0 ? (amount / curExpense * 100).toFixed(1) : 0;
+      return `<li>${i + 1}. ${escapeHtml(name)}: <span class="insight-highlight">${money(amount)}</span> (${pct}%)</li>`;
+    }).join("");
+
+    cards.push(`<div class="insight-card">
+      <h4>🏆 Top Spending Categories</h4>
+      <ul>${topItems}</ul>
+    </div>`);
+  }
+
+  // 4. Budget alerts
+  const budgetAlerts = [];
+  for (const cat of categories) {
+    if (!cat.budget || cat.budget <= 0) continue;
+    const period = cat.budgetPeriod || "month";
+    if (period !== "month") continue;
+    const spent = curMonthTxs.filter((t) => t.categoryId === cat.id && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    const pct = (spent / cat.budget) * 100;
+    if (pct >= 80) {
+      budgetAlerts.push({ name: cat.name, spent, budget: cat.budget, pct });
+    }
+  }
+  if (budgetAlerts.length > 0) {
+    const alertItems = budgetAlerts.map((a) => {
+      const cls = a.pct >= 100 ? 'insight-warn' : 'insight-highlight';
+      const label = a.pct >= 100 ? '⚠️ OVER BUDGET' : `⚡ ${a.pct.toFixed(0)}% used`;
+      return `<li>${escapeHtml(a.name)}: ${money(a.spent)} / ${money(a.budget)} — <span class="${cls}">${label}</span></li>`;
+    }).join("");
+
+    cards.push(`<div class="insight-card">
+      <h4>🚨 Budget Alerts</h4>
+      <ul>${alertItems}</ul>
+    </div>`);
+  }
+
+  // 5. Spending pattern (weekday vs weekend)
+  const weekdaySpend = { total: 0, count: 0 };
+  const weekendSpend = { total: 0, count: 0 };
+  for (const tx of curMonthTxs) {
+    if (tx.type !== "expense") continue;
+    const d = new Date(tx.dateISO);
+    const day = d.getDay();
+    if (day === 0 || day === 6) {
+      weekendSpend.total += tx.amount;
+      weekendSpend.count++;
+    } else {
+      weekdaySpend.total += tx.amount;
+      weekdaySpend.count++;
+    }
+  }
+  if (weekdaySpend.count > 0 || weekendSpend.count > 0) {
+    const wdAvg = weekdaySpend.count > 0 ? weekdaySpend.total / weekdaySpend.count : 0;
+    const weAvg = weekendSpend.count > 0 ? weekendSpend.total / weekendSpend.count : 0;
+    const higher = weAvg > wdAvg ? "weekends" : "weekdays";
+
+    cards.push(`<div class="insight-card">
+      <h4>📅 Spending Pattern</h4>
+      <ul>
+        <li>Avg per weekday transaction: <span class="insight-highlight">${money(wdAvg)}</span> (${weekdaySpend.count} txns)</li>
+        <li>Avg per weekend transaction: <span class="insight-highlight">${money(weAvg)}</span> (${weekendSpend.count} txns)</li>
+        <li>You tend to spend more on <strong>${higher}</strong></li>
+      </ul>
+    </div>`);
+  }
+
+  els.insightsContent.innerHTML = cards.join("");
+}
+
+/* ─── Receipt OCR Scan ─── */
+let receiptStream = null;
+let TesseractWorker = null;
+let receiptExtractedAmount = null;
+let receiptExtractedText = "";
+
+async function ensureTesseract() {
+  if (TesseractWorker) return TesseractWorker;
+  if (els.receiptStatus) els.receiptStatus.textContent = "Loading OCR engine…";
+
+  // Load Tesseract.js via script tag if not already loaded
+  if (!globalThis.Tesseract) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("Failed to load Tesseract.js"));
+      document.head.appendChild(script);
+    });
+  }
+
+  const worker = await globalThis.Tesseract.createWorker("eng");
+  TesseractWorker = worker;
+  if (els.receiptStatus) els.receiptStatus.textContent = "";
+  return worker;
+}
+
+function stopReceiptCamera() {
+  if (receiptStream) {
+    for (const track of receiptStream.getTracks()) track.stop();
+    receiptStream = null;
+  }
+  if (els.receiptVideo) els.receiptVideo.hidden = true;
+  if (els.receiptCaptureBtn) els.receiptCaptureBtn.hidden = true;
+}
+
+function openReceiptModal() {
+  if (els.receiptModal) els.receiptModal.hidden = false;
+  if (els.receiptResult) els.receiptResult.hidden = true;
+  if (els.receiptPreview) els.receiptPreview.hidden = true;
+  if (els.receiptStatus) els.receiptStatus.textContent = "";
+  receiptExtractedAmount = null;
+  receiptExtractedText = "";
+}
+
+function closeReceiptModal() {
+  stopReceiptCamera();
+  if (els.receiptModal) els.receiptModal.hidden = true;
+  if (els.receiptResult) els.receiptResult.hidden = true;
+  if (els.receiptPreview) els.receiptPreview.hidden = true;
+}
+
+async function startReceiptCamera() {
+  try {
+    stopReceiptCamera();
+    receiptStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+    });
+    els.receiptVideo.srcObject = receiptStream;
+    els.receiptVideo.hidden = false;
+    els.receiptCaptureBtn.hidden = false;
+    if (els.receiptStatus) els.receiptStatus.textContent = "Point camera at receipt and tap Capture.";
+  } catch (err) {
+    if (els.receiptStatus) els.receiptStatus.textContent = "Camera not available. Try uploading an image instead.";
+  }
+}
+
+function captureFromVideo() {
+  const video = els.receiptVideo;
+  const canvas = els.receiptCanvas;
+  if (!video || !canvas) return null;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
+  stopReceiptCamera();
+  return canvas;
+}
+
+async function processReceiptImage(imageSource) {
+  if (els.receiptStatus) els.receiptStatus.textContent = "Analyzing receipt…";
+  if (els.receiptResult) els.receiptResult.hidden = true;
+
+  try {
+    const worker = await ensureTesseract();
+    const { data } = await worker.recognize(imageSource);
+    const fullText = data.text || "";
+
+    // Extract amounts — look for currency patterns
+    const amountRegex = /(?:RM|MYR|USD|\$|€|£|¥)?\s*(\d{1,}[.,]\d{2})\b/gi;
+    const amounts = [];
+    let match;
+    while ((match = amountRegex.exec(fullText)) !== null) {
+      const val = parseFloat(match[1].replace(",", "."));
+      if (val > 0 && val < 1000000) amounts.push(val);
+    }
+
+    // Also try plain number patterns like "12.50" on their own lines
+    if (amounts.length === 0) {
+      const lineAmounts = fullText.split("\n").map((l) => l.trim()).filter((l) => /^\d+[.,]\d{2}$/.test(l));
+      for (const la of lineAmounts) {
+        const val = parseFloat(la.replace(",", "."));
+        if (val > 0) amounts.push(val);
+      }
+    }
+
+    // Pick the largest amount as "total"
+    const bestAmount = amounts.length > 0 ? Math.max(...amounts) : null;
+    receiptExtractedAmount = bestAmount;
+
+    // Clean the text for note — take first meaningful non-number line
+    const lines = fullText.split("\n").map((l) => l.trim()).filter((l) => l.length > 2);
+    const noteLines = lines.filter((l) => !/^\d+[.,]\d{2}$/.test(l)).slice(0, 3);
+    receiptExtractedText = noteLines.join(" ").substring(0, 80);
+
+    if (els.receiptAmountResult) els.receiptAmountResult.textContent = bestAmount != null ? money(bestAmount) : "Not detected";
+    if (els.receiptTextResult) els.receiptTextResult.textContent = receiptExtractedText || "Not detected";
+    if (els.receiptResult) els.receiptResult.hidden = false;
+    if (els.receiptStatus) els.receiptStatus.textContent = "Done! Review the extracted data below.";
+  } catch (err) {
+    if (els.receiptStatus) els.receiptStatus.textContent = "OCR failed: " + (err.message || "Unknown error");
+  }
+}
+
+function applyReceiptToForm() {
+  if (receiptExtractedAmount != null) {
+    els.txAmount.value = String(receiptExtractedAmount);
+  }
+  if (receiptExtractedText) {
+    els.txNote.value = receiptExtractedText;
+    updateAutoCategorySuggestion();
+  }
+  closeReceiptModal();
 }
 
 /** Scroll to top of the page for pagination UX */
@@ -2337,6 +2701,11 @@ function wireEvents() {
       document.body.classList.add("sidebar-collapsed");
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // Auto-generate insights when navigating to that view
+    if (viewName === "insights") {
+      generateInsights();
+    }
   }
 
   if (menuBtn) menuBtn.addEventListener("click", openSidebar);
@@ -2742,6 +3111,67 @@ function wireEvents() {
     if (field) field.addEventListener("change", checkDuplicate);
   }
   if (els.txAmount) els.txAmount.addEventListener("input", debounce(checkDuplicate, 300));
+
+  // Auto-categorization on note input
+  if (els.txNote) {
+    els.txNote.addEventListener("input", debounce(updateAutoCategorySuggestion, 300));
+  }
+
+  // Receipt scan
+  if (els.scanReceiptBtn) {
+    els.scanReceiptBtn.addEventListener("click", openReceiptModal);
+  }
+  if (els.closeReceiptModal) {
+    els.closeReceiptModal.addEventListener("click", closeReceiptModal);
+  }
+  if (els.receiptModal) {
+    els.receiptModal.addEventListener("click", (e) => {
+      if (e.target === els.receiptModal) closeReceiptModal();
+    });
+  }
+  if (els.receiptCameraBtn) {
+    els.receiptCameraBtn.addEventListener("click", startReceiptCamera);
+  }
+  if (els.receiptFileInput) {
+    els.receiptFileInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      if (els.receiptPreview) {
+        els.receiptPreview.src = url;
+        els.receiptPreview.hidden = false;
+      }
+      stopReceiptCamera();
+      await processReceiptImage(file);
+      els.receiptFileInput.value = "";
+    });
+  }
+  if (els.receiptCaptureBtn) {
+    els.receiptCaptureBtn.addEventListener("click", async () => {
+      const canvas = captureFromVideo();
+      if (!canvas) return;
+      if (els.receiptPreview) {
+        els.receiptPreview.src = canvas.toDataURL("image/png");
+        els.receiptPreview.hidden = false;
+      }
+      await processReceiptImage(canvas);
+    });
+  }
+  if (els.receiptApplyBtn) {
+    els.receiptApplyBtn.addEventListener("click", applyReceiptToForm);
+  }
+  if (els.receiptRetryBtn) {
+    els.receiptRetryBtn.addEventListener("click", () => {
+      if (els.receiptResult) els.receiptResult.hidden = true;
+      if (els.receiptPreview) els.receiptPreview.hidden = true;
+      if (els.receiptStatus) els.receiptStatus.textContent = "";
+    });
+  }
+
+  // Insights
+  if (els.refreshInsightsBtn) {
+    els.refreshInsightsBtn.addEventListener("click", generateInsights);
+  }
 
   // Quick-fill Today button
   if (els.todayBtn) {

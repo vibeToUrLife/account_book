@@ -1720,3 +1720,98 @@ body {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* ─── Auto-category suggestion hint ─── */
+.auto-cat-hint {
+  margin-top: 4px;
+  color: var(--primary);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.auto-cat-hint:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* ─── Insights View ─── */
+.insights-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.insight-card {
+  background: var(--stat-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+.insight-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.insight-card p, .insight-card ul {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.insight-card ul {
+  padding-left: 18px;
+}
+.insight-card .insight-highlight {
+  font-weight: 600;
+  color: var(--primary);
+}
+.insight-card .insight-warn {
+  color: var(--danger);
+  font-weight: 600;
+}
+.insight-card .insight-good {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* ─── Receipt Scan Modal ─── */
+.receipt-scan-body {
+  display: flex;
+  flex-direction: column;
+}
+.receipt-capture-area {
+  margin-top: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--input-bg);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.receipt-video {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+.receipt-preview {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+.receipt-result {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--stat-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.receipt-result-header {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.receipt-result-row {
+  font-size: 13px;
+  line-height: 1.8;
+}
+
