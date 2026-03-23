@@ -135,6 +135,9 @@ export function userCollections(uid) {
     userDoc,
     categories: collection(userDoc, "categories"),
     transactions: collection(userDoc, "transactions"),
+    settings: collection(userDoc, "settings"),
+    savingsGoals: collection(userDoc, "savingsGoals"),
+    recurring: collection(userDoc, "recurring"),
   };
 }
 

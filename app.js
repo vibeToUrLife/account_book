@@ -140,6 +140,7 @@ const els = {
   receiptRetryBtn: document.getElementById("receiptRetryBtn"),
   insightsContent: document.getElementById("insightsContent"),
   refreshInsightsBtn: document.getElementById("refreshInsightsBtn"),
+  currencySymbolInput: document.getElementById("currencySymbolInput"),
 };
 
 let ChartJs = null;
@@ -148,6 +149,14 @@ let statsChartInstance = null;
 let editingCategoryId = null;
 let editingTransactionId = null;
 let lastUsedCategoryId = null;
+
+// User settings
+let currencySymbol = "";
+let savingsGoals = [];
+let recurringRules = [];
+let unsubSettings = null;
+let unsubGoals = null;
+let unsubRecurring = null;
 
 async function ensureChartJs() {
   if (ChartJs) return ChartJs;
@@ -250,7 +259,7 @@ function initTheme() {
 
 function money(n) {
   const v = Number(n || 0);
-  return v.toFixed(2);
+  return `${currencySymbol}${v.toFixed(2)}`;
 }
 
 function todayISO() {
@@ -1110,6 +1119,9 @@ function renderAll() {
     renderStats();
     updateNoteSuggestions();
     renderQuickRepeat();
+    renderDashboard();
+    renderSavingsGoals();
+    renderRecurringRules();
   });
 }
 
@@ -1123,10 +1135,35 @@ function escapeHtml(s) {
 }
 
 async function startListenersForUser(userId) {
-  const { categories: categoriesCol, transactions: txCol } = userCollections(userId);
+  const { categories: categoriesCol, transactions: txCol, settings: settingsCol, savingsGoals: goalsCol, recurring: recurringCol } = userCollections(userId);
 
   if (unsubCategories) unsubCategories();
   if (unsubTransactions) unsubTransactions();
+  if (unsubSettings) unsubSettings();
+  if (unsubGoals) unsubGoals();
+  if (unsubRecurring) unsubRecurring();
+
+  // Listen to user settings (currency, etc.)
+  unsubSettings = onSnapshot(doc(settingsCol, "preferences"), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      currencySymbol = data.currencySymbol || "";
+      if (els.currencySymbolInput) els.currencySymbolInput.value = currencySymbol;
+    }
+    renderAll();
+  });
+
+  // Listen to savings goals
+  unsubGoals = onSnapshot(query(goalsCol, orderBy("createdAt", "asc")), (snap) => {
+    savingsGoals = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderSavingsGoals();
+  });
+
+  // Listen to recurring rules
+  unsubRecurring = onSnapshot(query(recurringCol, orderBy("createdAt", "asc")), (snap) => {
+    recurringRules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderRecurringRules();
+  });
 
   unsubCategories = onSnapshot(query(categoriesCol, orderBy("createdAt", "asc")), (snap) => {
     categories = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -1142,7 +1179,6 @@ async function startListenersForUser(userId) {
   unsubTransactions = onSnapshot(query(txCol, orderBy("createdAt", "desc")), (snap) => {
     transactions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    // Keep categoryName in sync if category renamed in future.
     const nameById = new Map(categories.map((c) => [c.id, c.name]));
     transactions = transactions.map((t) => ({
       ...t,
@@ -1158,8 +1194,14 @@ async function startListenersForUser(userId) {
 function stopListeners() {
   if (unsubCategories) unsubCategories();
   if (unsubTransactions) unsubTransactions();
+  if (unsubSettings) unsubSettings();
+  if (unsubGoals) unsubGoals();
+  if (unsubRecurring) unsubRecurring();
   unsubCategories = null;
   unsubTransactions = null;
+  unsubSettings = null;
+  unsubGoals = null;
+  unsubRecurring = null;
 }
 
 function setSignedOutUi() {
@@ -1167,6 +1209,9 @@ function setSignedOutUi() {
   stopListeners();
   categories = [];
   transactions = [];
+  savingsGoals = [];
+  recurringRules = [];
+  currencySymbol = "";
   activeCategoryId = "";
   txPage = 1;
   setAppError("");
@@ -2648,6 +2693,470 @@ function applyReceiptToForm() {
   closeReceiptModal();
 }
 
+/* ─── Dashboard ─── */
+function renderDashboard() {
+  const now = new Date();
+  const thisMonth = currentMonthValue(now);
+  const monthTxs = transactions.filter((t) => t.dateISO && t.dateISO.substring(0, 7) === thisMonth);
+
+  let expense = 0, revenue = 0;
+  for (const tx of monthTxs) {
+    if (tx.type === "expense") expense += tx.amount;
+    else revenue += tx.amount;
+  }
+
+  const dashExpense = document.getElementById("dashExpense");
+  const dashRevenue = document.getElementById("dashRevenue");
+  const dashNet = document.getElementById("dashNet");
+  const dashCount = document.getElementById("dashCount");
+
+  if (dashExpense) dashExpense.textContent = money(expense);
+  if (dashRevenue) dashRevenue.textContent = money(revenue);
+  if (dashNet) {
+    const net = revenue - expense;
+    dashNet.textContent = money(net);
+    dashNet.style.color = net >= 0 ? "var(--success)" : "var(--danger)";
+  }
+  if (dashCount) dashCount.textContent = String(transactions.length);
+
+  // Recent transactions (last 5)
+  const dashRecent = document.getElementById("dashRecentTx");
+  if (dashRecent) {
+    const recent = transactions.slice(0, 5);
+    if (recent.length === 0) {
+      dashRecent.innerHTML = '<div class="muted small">No recent transactions.</div>';
+    } else {
+      dashRecent.innerHTML = recent.map((tx) => {
+        const cls = tx.type === "expense" ? "expense" : "revenue";
+        const sign = tx.type === "expense" ? "-" : "+";
+        return `<div class="dash-recent-item">
+          <span>${escapeHtml(tx.dateISO)}</span>
+          <span class="dash-tx-note">${escapeHtml(tx.categoryName || "")} ${escapeHtml(tx.note || "")}</span>
+          <span class="dash-tx-amount ${cls}">${sign}${money(tx.amount)}</span>
+        </div>`;
+      }).join("");
+    }
+  }
+
+  // Budget alerts
+  const dashAlerts = document.getElementById("dashBudgetAlerts");
+  if (dashAlerts) {
+    const monthRef = budgetMonthRefDate();
+    const alerts = [];
+    for (const cat of categories) {
+      if (!cat.budget || cat.budget <= 0) continue;
+      const period = cat.budgetPeriod || "month";
+      if (period !== "month") continue;
+      const { spent } = computeCategoryTotals(cat.id, period, monthRef);
+      const pct = (spent / cat.budget) * 100;
+      if (pct >= 80) {
+        const label = pct >= 100 ? "⛔ OVER BUDGET" : `⚡ ${Math.round(pct)}% used`;
+        alerts.push(`<div class="dash-alert-item">${escapeHtml(cat.name)}: ${money(spent)} / ${money(cat.budget)} — ${label}</div>`);
+      }
+    }
+    dashAlerts.innerHTML = alerts.length > 0 ? alerts.join("") : '<div class="muted small">All budgets are on track. 👍</div>';
+  }
+}
+
+/* ─── Category Trends Chart ─── */
+async function renderTrendChart() {
+  const canvas = document.getElementById("trendChart");
+  const msgEl = document.getElementById("trendChartMessage");
+  if (!canvas) return;
+
+  if (transactions.length === 0) {
+    if (msgEl) { msgEl.textContent = "No data yet."; msgEl.hidden = false; }
+    canvas.style.visibility = "hidden";
+    return;
+  }
+
+  try {
+    const Chart = await ensureChartJs();
+
+    // Get last 6 months
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(currentMonthValue(d));
+    }
+
+    // Top 5 expense categories by total spending
+    const catTotals = new Map();
+    for (const tx of transactions) {
+      if (tx.type !== "expense") continue;
+      const m = tx.dateISO ? tx.dateISO.substring(0, 7) : "";
+      if (!months.includes(m)) continue;
+      catTotals.set(tx.categoryId, (catTotals.get(tx.categoryId) || 0) + tx.amount);
+    }
+    const topCats = [...catTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id]) => id);
+
+    const colors = ["#7c5cfc", "#e54360", "#22c55e", "#e89420", "#3b82f6"];
+    const datasets = topCats.map((catId, i) => {
+      const cat = categories.find((c) => c.id === catId);
+      const data = months.map((m) => {
+        return transactions.filter((t) => t.categoryId === catId && t.type === "expense" && t.dateISO && t.dateISO.substring(0, 7) === m)
+          .reduce((s, t) => s + t.amount, 0);
+      });
+      return {
+        label: cat ? cat.name : "(Unknown)",
+        data,
+        borderColor: colors[i % colors.length],
+        backgroundColor: colors[i % colors.length] + "22",
+        fill: false,
+        tension: 0.3,
+      };
+    });
+
+    if (window._trendChart) window._trendChart.destroy();
+    window._trendChart = new Chart(canvas, {
+      type: "line",
+      data: { labels: months, datasets },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+        scales: {
+          y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+          x: { ticks: { font: { size: 10 } } },
+        },
+      },
+    });
+
+    if (msgEl) msgEl.hidden = true;
+    canvas.style.visibility = "visible";
+  } catch (err) {
+    if (msgEl) { msgEl.textContent = "Chart unavailable."; msgEl.hidden = false; }
+  }
+}
+
+/* ─── Savings Goals ─── */
+function renderSavingsGoals() {
+  const container = document.getElementById("goalsContainer");
+  if (!container) return;
+
+  if (savingsGoals.length === 0) {
+    container.innerHTML = '<div class="muted small">No savings goals yet. Add one above!</div>';
+    return;
+  }
+
+  // Calculate total saved = revenue - expense across all time
+  const totalRevenue = transactions.filter((t) => t.type === "revenue").reduce((s, t) => s + t.amount, 0);
+  const totalExpense = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const totalSaved = Math.max(0, totalRevenue - totalExpense);
+
+  container.innerHTML = savingsGoals.map((g) => {
+    const target = g.target || 0;
+    const saved = Math.min(totalSaved, target);
+    const pct = target > 0 ? Math.min(100, (saved / target) * 100) : 0;
+    const isDone = pct >= 100;
+    const deadline = g.deadline ? `Due: ${g.deadline}` : "No deadline";
+
+    return `<div class="goal-card">
+      <div class="goal-card-header">
+        <h4>🎯 ${escapeHtml(g.name || "Untitled")}</h4>
+        <span class="goal-deadline">${deadline}</span>
+      </div>
+      <div class="goal-progress-bar">
+        <div class="goal-progress-fill ${isDone ? 'done' : ''}" style="width:${pct}%"></div>
+      </div>
+      <div class="goal-stats">
+        <span>${money(saved)} / ${money(target)}</span>
+        <span class="goal-pct">${pct.toFixed(1)}%</span>
+      </div>
+      <div class="goal-actions">
+        <button class="btn btn-danger btn-small" type="button" data-action="delete-goal" data-id="${g.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function addSavingsGoal() {
+  const nameInput = document.getElementById("goalName");
+  const targetInput = document.getElementById("goalTarget");
+  const deadlineInput = document.getElementById("goalDeadline");
+  if (!nameInput || !targetInput) return;
+
+  const name = normalizeText(nameInput.value);
+  const target = parsePositiveAmount(targetInput.value);
+  const deadline = deadlineInput ? deadlineInput.value : "";
+
+  if (!name || target == null) return;
+
+  const { savingsGoals: goalsCol } = userCollections(uid);
+  await addDoc(goalsCol, { name, target, deadline, createdAt: serverTimestamp() });
+
+  nameInput.value = "";
+  targetInput.value = "";
+  if (deadlineInput) deadlineInput.value = "";
+}
+
+async function deleteSavingsGoal(goalId) {
+  const { savingsGoals: goalsCol } = userCollections(uid);
+  await deleteDoc(doc(goalsCol, goalId));
+}
+
+/* ─── Recurring Transactions ─── */
+function renderRecurringRules() {
+  const container = document.getElementById("recurringContainer");
+  if (!container) return;
+
+  // Populate the category select in the recurring form
+  const recCatSelect = document.getElementById("recurringCategory");
+  if (recCatSelect && recCatSelect.options.length <= 1) {
+    recCatSelect.innerHTML = "";
+    for (const c of categories) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name;
+      recCatSelect.appendChild(opt);
+    }
+  }
+
+  if (recurringRules.length === 0) {
+    container.innerHTML = '<div class="muted small">No recurring rules yet.</div>';
+    return;
+  }
+
+  container.innerHTML = recurringRules.map((r) => {
+    const cat = categories.find((c) => c.id === r.categoryId);
+    const catName = cat ? cat.name : "(Unknown)";
+    const typeLabel = r.type === "expense" ? "Expense" : "Revenue";
+    return `<div class="recurring-card">
+      <div class="recurring-info">
+        <div class="recurring-name">${escapeHtml(catName)} — ${escapeHtml(r.note || "")}</div>
+        <div class="recurring-detail">${typeLabel} · ${money(r.amount)} · Day ${r.dayOfMonth || 1} each month</div>
+      </div>
+      <button class="btn btn-danger btn-small" type="button" data-action="delete-recurring" data-id="${r.id}">Delete</button>
+    </div>`;
+  }).join("");
+}
+
+async function addRecurringRule() {
+  const catSelect = document.getElementById("recurringCategory");
+  const typeSelect = document.getElementById("recurringType");
+  const amountInput = document.getElementById("recurringAmount");
+  const noteInput = document.getElementById("recurringNote");
+  const dayInput = document.getElementById("recurringDay");
+
+  if (!catSelect || !amountInput || !dayInput) return;
+
+  const categoryId = catSelect.value;
+  const type = typeSelect ? typeSelect.value : "expense";
+  const amount = parsePositiveAmount(amountInput.value);
+  const note = normalizeText(noteInput ? noteInput.value : "");
+  const dayOfMonth = clamp(parseInt(dayInput.value, 10) || 1, 1, 31);
+
+  if (!categoryId || amount == null) return;
+
+  const category = categories.find((c) => c.id === categoryId);
+  const categoryName = category ? category.name : "(Unknown)";
+
+  const { recurring: recurringCol } = userCollections(uid);
+  await addDoc(recurringCol, { categoryId, categoryName, type, amount, note, dayOfMonth, createdAt: serverTimestamp() });
+
+  amountInput.value = "";
+  if (noteInput) noteInput.value = "";
+  dayInput.value = "";
+}
+
+async function deleteRecurringRule(ruleId) {
+  const { recurring: recurringCol } = userCollections(uid);
+  await deleteDoc(doc(recurringCol, ruleId));
+}
+
+async function runDueRecurring() {
+  const today = new Date();
+  const dayOfMonth = today.getDate();
+  const dateISO = todayISO();
+
+  const due = recurringRules.filter((r) => (r.dayOfMonth || 1) === dayOfMonth);
+  if (due.length === 0) {
+    setAppError("No recurring transactions due today (day " + dayOfMonth + ").");
+    return;
+  }
+
+  const { transactions: txCol } = userCollections(uid);
+  let count = 0;
+  for (const r of due) {
+    // Check if already added today for this rule
+    const alreadyDone = transactions.some((t) => t.dateISO === dateISO && t.categoryId === r.categoryId && t.amount === r.amount && (t.note || "") === (r.note || ""));
+    if (alreadyDone) continue;
+
+    await addDoc(txCol, {
+      categoryId: r.categoryId,
+      categoryName: r.categoryName || "(Unknown)",
+      type: r.type,
+      amount: r.amount,
+      note: r.note || "",
+      noteLower: (r.note || "").toLowerCase(),
+      dateISO,
+      createdAt: serverTimestamp(),
+    });
+    count++;
+  }
+  setAppError(count > 0 ? `✅ Added ${count} recurring transaction(s).` : "All due recurring transactions already recorded today.");
+}
+
+/* ─── Settings: Currency ─── */
+async function saveCurrencySymbol() {
+  const input = document.getElementById("currencySymbolInput");
+  if (!input) return;
+  const symbol = input.value.trim().substring(0, 5);
+  const { settings: settingsCol } = userCollections(uid);
+  await setDoc(doc(settingsCol, "preferences"), { currencySymbol: symbol }, { merge: true });
+  currencySymbol = symbol;
+  renderAll();
+}
+
+/* ─── Data Export/Import ─── */
+function exportDataAsJson() {
+  const data = {
+    exportDate: new Date().toISOString(),
+    categories: categories.map((c) => ({ ...c })),
+    transactions: transactions.map((t) => ({ ...t })),
+    savingsGoals: savingsGoals.map((g) => ({ ...g })),
+    recurringRules: recurringRules.map((r) => ({ ...r })),
+    settings: { currencySymbol },
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `accountbook-backup-${todayISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importDataFromJson(file) {
+  const statusEl = document.getElementById("importStatus");
+  if (!file) return;
+
+  try {
+    if (statusEl) statusEl.textContent = "Reading file…";
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (!data.categories || !data.transactions) {
+      if (statusEl) statusEl.textContent = "❌ Invalid backup file format.";
+      return;
+    }
+
+    if (statusEl) statusEl.textContent = "Importing…";
+
+    const { categories: catCol, transactions: txCol, savingsGoals: goalsCol, recurring: recCol, settings: settingsCol } = userCollections(uid);
+
+    // Import categories
+    let catCount = 0;
+    for (const c of data.categories) {
+      if (!c.name) continue;
+      const docData = { name: c.name, budget: c.budget || 0, budgetPeriod: c.budgetPeriod || "month", createdAt: serverTimestamp() };
+      await addDoc(catCol, docData);
+      catCount++;
+    }
+
+    // Import transactions
+    let txCount = 0;
+    for (const t of data.transactions) {
+      if (!t.categoryId || !t.amount) continue;
+      const docData = {
+        categoryId: t.categoryId, categoryName: t.categoryName || "", type: t.type || "expense",
+        amount: t.amount, note: t.note || "", noteLower: (t.note || "").toLowerCase(),
+        dateISO: t.dateISO || todayISO(), createdAt: serverTimestamp(),
+      };
+      await addDoc(txCol, docData);
+      txCount++;
+    }
+
+    // Import goals
+    let goalCount = 0;
+    if (data.savingsGoals) {
+      for (const g of data.savingsGoals) {
+        if (!g.name) continue;
+        await addDoc(goalsCol, { name: g.name, target: g.target || 0, deadline: g.deadline || "", createdAt: serverTimestamp() });
+        goalCount++;
+      }
+    }
+
+    // Import recurring
+    let recCount = 0;
+    if (data.recurringRules) {
+      for (const r of data.recurringRules) {
+        if (!r.categoryId) continue;
+        await addDoc(recCol, {
+          categoryId: r.categoryId, categoryName: r.categoryName || "", type: r.type || "expense",
+          amount: r.amount || 0, note: r.note || "", dayOfMonth: r.dayOfMonth || 1, createdAt: serverTimestamp(),
+        });
+        recCount++;
+      }
+    }
+
+    // Import settings
+    if (data.settings && data.settings.currencySymbol != null) {
+      await setDoc(doc(settingsCol, "preferences"), { currencySymbol: data.settings.currencySymbol }, { merge: true });
+    }
+
+    if (statusEl) statusEl.textContent = `✅ Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules.`;
+  } catch (err) {
+    if (statusEl) statusEl.textContent = "❌ Import failed: " + (err.message || "Unknown error");
+  }
+}
+
+/* ─── PDF Report ─── */
+async function generatePdfReport() {
+  const monthInput = document.getElementById("pdfReportMonth");
+  if (!monthInput || !monthInput.value) return;
+  const month = monthInput.value; // "YYYY-MM"
+
+  const monthTxs = transactions.filter((t) => t.dateISO && t.dateISO.substring(0, 7) === month);
+  if (monthTxs.length === 0) {
+    setAppError("No transactions found for " + month);
+    return;
+  }
+
+  let totalExp = 0, totalRev = 0;
+  for (const tx of monthTxs) {
+    if (tx.type === "expense") totalExp += tx.amount;
+    else totalRev += tx.amount;
+  }
+
+  // Generate printable HTML
+  const rows = monthTxs.map((tx) =>
+    `<tr><td>${escapeHtml(tx.dateISO)}</td><td>${escapeHtml(tx.categoryName || "")}</td><td>${tx.type === "expense" ? "Expense" : "Revenue"}</td><td style="text-align:right">${money(tx.amount)}</td><td>${escapeHtml(tx.note || "")}</td></tr>`
+  ).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report ${month}</title>
+<style>
+body{font-family:Arial,sans-serif;margin:40px;color:#2d2640;}
+h1{font-size:22px;margin-bottom:4px;}
+.sub{color:#666;font-size:13px;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{border:1px solid #ddd;padding:8px 10px;text-align:left;}
+th{background:#f4f1fb;font-weight:700;}
+.summary{margin-bottom:20px;display:flex;gap:30px;}
+.summary div{font-size:14px;}
+.summary strong{font-size:18px;}
+@media print{body{margin:20px;}}
+</style></head><body>
+<h1>💰 Account Book — Monthly Report</h1>
+<div class="sub">${month}</div>
+<div class="summary">
+<div>Expense: <strong style="color:#e54360">${money(totalExp)}</strong></div>
+<div>Revenue: <strong style="color:#22c55e">${money(totalRev)}</strong></div>
+<div>Net: <strong>${money(totalRev - totalExp)}</strong></div>
+</div>
+<table><thead><tr><th>Date</th><th>Category</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table>
+<div style="margin-top:20px;color:#999;font-size:11px;">Generated on ${new Date().toLocaleString()}</div>
+</body></html>`;
+
+  const printWin = window.open("", "_blank");
+  if (printWin) {
+    printWin.document.write(html);
+    printWin.document.close();
+    setTimeout(() => printWin.print(), 500);
+  }
+}
+
 /** Scroll to top of the page for pagination UX */
 function scrollToRecordList() {
   if (window.scrollY < 10) return; /* Already at top, skip */
@@ -2705,6 +3214,16 @@ function wireEvents() {
     // Auto-generate insights when navigating to that view
     if (viewName === "insights") {
       generateInsights();
+    }
+    if (viewName === "dashboard") {
+      renderDashboard();
+      renderTrendChart();
+    }
+    if (viewName === "goals") {
+      renderSavingsGoals();
+    }
+    if (viewName === "recurring") {
+      renderRecurringRules();
     }
   }
 
@@ -3212,6 +3731,68 @@ function wireEvents() {
       a.click();
       URL.revokeObjectURL(url);
     });
+  }
+
+  // ── Savings Goals ──
+  const goalForm = document.getElementById("goalForm");
+  if (goalForm) {
+    goalForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      addSavingsGoal();
+    });
+  }
+  const goalsContainer = document.getElementById("goalsContainer");
+  if (goalsContainer) {
+    goalsContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action='delete-goal']");
+      if (btn && btn.dataset.id) deleteSavingsGoal(btn.dataset.id);
+    });
+  }
+
+  // ── Recurring Transactions ──
+  const recurringForm = document.getElementById("recurringForm");
+  if (recurringForm) {
+    recurringForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      addRecurringRule();
+    });
+  }
+  const recurringContainer = document.getElementById("recurringContainer");
+  if (recurringContainer) {
+    recurringContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action='delete-recurring']");
+      if (btn && btn.dataset.id) deleteRecurringRule(btn.dataset.id);
+    });
+  }
+  const runRecurringBtn = document.getElementById("runRecurringBtn");
+  if (runRecurringBtn) {
+    runRecurringBtn.addEventListener("click", runDueRecurring);
+  }
+
+  // ── Settings: Currency ──
+  const saveCurrencyBtn = document.getElementById("saveCurrencyBtn");
+  if (saveCurrencyBtn) {
+    saveCurrencyBtn.addEventListener("click", saveCurrencySymbol);
+  }
+
+  // ── Data Export/Import ──
+  const exportJsonBtn = document.getElementById("exportJsonBtn");
+  if (exportJsonBtn) {
+    exportJsonBtn.addEventListener("click", exportDataAsJson);
+  }
+  const importJsonInput = document.getElementById("importJsonInput");
+  if (importJsonInput) {
+    importJsonInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) importDataFromJson(file);
+      importJsonInput.value = "";
+    });
+  }
+
+  // ── PDF Report ──
+  const exportPdfBtn = document.getElementById("exportPdfBtn");
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener("click", generatePdfReport);
   }
 
   // Escape key cancels editing

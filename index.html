@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Account Book</title>
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#7c5cfc" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -51,6 +55,22 @@
         <button class="sidebar-item" data-view="insights" type="button">
           <span class="sidebar-icon">🧠</span>
           <span>Insights</span>
+        </button>
+        <button class="sidebar-item" data-view="dashboard" type="button">
+          <span class="sidebar-icon">🏠</span>
+          <span>Dashboard</span>
+        </button>
+        <button class="sidebar-item" data-view="goals" type="button">
+          <span class="sidebar-icon">🎯</span>
+          <span>Savings Goals</span>
+        </button>
+        <button class="sidebar-item" data-view="recurring" type="button">
+          <span class="sidebar-icon">🔁</span>
+          <span>Recurring</span>
+        </button>
+        <button class="sidebar-item" data-view="settings" type="button">
+          <span class="sidebar-icon">⚙️</span>
+          <span>Settings</span>
         </button>
       </div>
     </nav>
@@ -362,6 +382,181 @@
           </div>
         </section>
 
+        <!-- VIEW: Dashboard -->
+        <section class="card stack view-section" data-view="dashboard" aria-label="Dashboard">
+          <div class="row">
+            <h2>🏠 Dashboard</h2>
+            <div class="muted small">Quick overview of your finances.</div>
+          </div>
+          <div id="dashboardContent" class="dashboard-grid">
+            <div class="dash-card">
+              <div class="dash-card-icon">💸</div>
+              <div class="dash-card-label">This Month Expense</div>
+              <div id="dashExpense" class="dash-card-value">0.00</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">💵</div>
+              <div class="dash-card-label">This Month Revenue</div>
+              <div id="dashRevenue" class="dash-card-value">0.00</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">💎</div>
+              <div class="dash-card-label">Net Balance</div>
+              <div id="dashNet" class="dash-card-value">0.00</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon">📦</div>
+              <div class="dash-card-label">Total Records</div>
+              <div id="dashCount" class="dash-card-value">0</div>
+            </div>
+          </div>
+          <div class="dash-section">
+            <h3>📋 Recent Transactions</h3>
+            <div id="dashRecentTx" class="dash-recent-list">
+              <div class="muted small">No recent transactions.</div>
+            </div>
+          </div>
+          <div class="dash-section">
+            <h3>⚠️ Budget Alerts</h3>
+            <div id="dashBudgetAlerts" class="dash-alerts">
+              <div class="muted small">All budgets are on track.</div>
+            </div>
+          </div>
+          <div class="dash-section">
+            <h3>📈 Category Trends</h3>
+            <div class="muted small">Monthly spending by category over time.</div>
+            <canvas id="trendChart" height="200"></canvas>
+            <div id="trendChartMessage" class="muted small" hidden></div>
+          </div>
+        </section>
+
+        <!-- VIEW: Savings Goals -->
+        <section class="card stack view-section" data-view="goals" aria-label="Savings Goals">
+          <div class="row">
+            <h2>🎯 Savings Goals</h2>
+            <div class="muted small">Set targets and track your progress.</div>
+          </div>
+          <form id="goalForm" class="stack-compact" autocomplete="off">
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Goal Name</span>
+                <input id="goalName" type="text" placeholder="e.g., Emergency Fund" required maxlength="40" />
+              </label>
+              <label class="field inline-sm">
+                <span>Target Amount</span>
+                <input id="goalTarget" type="number" min="1" step="0.01" placeholder="5000" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Deadline</span>
+                <input id="goalDeadline" type="date" />
+              </label>
+            </div>
+            <div class="row">
+              <button id="goalSubmitBtn" class="btn" type="submit">Add Goal</button>
+            </div>
+          </form>
+          <div class="divider-thin"></div>
+          <div id="goalsContainer" class="goals-list">
+            <div class="muted small">No savings goals yet.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Recurring Transactions -->
+        <section class="card stack view-section" data-view="recurring" aria-label="Recurring Transactions">
+          <div class="row">
+            <h2>🔁 Recurring Transactions</h2>
+            <div class="muted small">Auto-add monthly expenses or income.</div>
+          </div>
+          <form id="recurringForm" class="stack-compact" autocomplete="off">
+            <div class="grid-2">
+              <label class="field inline-sm">
+                <span>Category</span>
+                <select id="recurringCategory" required></select>
+              </label>
+              <label class="field inline-sm">
+                <span>Type</span>
+                <select id="recurringType" required>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </label>
+            </div>
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Amount</span>
+                <input id="recurringAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Note</span>
+                <input id="recurringNote" type="text" placeholder="e.g., Netflix" maxlength="80" />
+              </label>
+              <label class="field inline-sm">
+                <span>Day of Month</span>
+                <input id="recurringDay" type="number" min="1" max="31" placeholder="1" required />
+              </label>
+            </div>
+            <div class="row">
+              <button id="recurringSubmitBtn" class="btn" type="submit">Add Rule</button>
+            </div>
+          </form>
+          <div class="divider-thin"></div>
+          <div id="recurringContainer" class="recurring-list">
+            <div class="muted small">No recurring rules yet.</div>
+          </div>
+          <div class="row wrap" style="margin-top:12px;">
+            <button id="runRecurringBtn" class="btn btn-secondary" type="button">▶ Run Due Recurring Now</button>
+            <div class="muted small">Manually trigger any recurring transactions due today.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Settings -->
+        <section class="card stack view-section" data-view="settings" aria-label="Settings">
+          <div class="row">
+            <h2>⚙️ Settings</h2>
+            <div class="muted small">Configure your preferences.</div>
+          </div>
+
+          <div class="stack-compact">
+            <label class="field">
+              <span>Currency Symbol</span>
+              <div class="muted small">Prefix for all amounts (e.g., RM, $, €, £, ¥). Leave empty for no prefix.</div>
+              <input id="currencySymbolInput" type="text" placeholder="RM" maxlength="5" style="max-width:120px" />
+            </label>
+            <button id="saveCurrencyBtn" class="btn btn-secondary btn-small" type="button">Save Currency</button>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3>📦 Data Backup</h3>
+            <div class="muted small">Export all your data as JSON, or import a backup file.</div>
+            <div class="row wrap" style="gap:8px">
+              <button id="exportJsonBtn" class="btn btn-secondary" type="button">⬇ Export JSON</button>
+              <label class="btn btn-secondary" style="cursor:pointer;">
+                ⬆ Import JSON
+                <input id="importJsonInput" type="file" accept=".json,application/json" hidden />
+              </label>
+            </div>
+            <div id="importStatus" class="muted small"></div>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3>📄 PDF Report</h3>
+            <div class="muted small">Generate a monthly PDF report of your transactions.</div>
+            <div class="grid-2" style="max-width:360px">
+              <label class="field inline-sm">
+                <span>Report Month</span>
+                <input id="pdfReportMonth" type="month" required />
+              </label>
+              <div style="display:flex;align-items:flex-end;">
+                <button id="exportPdfBtn" class="btn btn-secondary" type="button">📄 Generate PDF</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div> <!-- .view-container -->
       </div>
 
@@ -474,6 +669,11 @@
           });
         }
       });
+    </script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      }
     </script>
   </body>
 </html>
