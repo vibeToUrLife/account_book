@@ -560,6 +560,47 @@
       </div> <!-- .view-container -->
       </div>
 
+      <!-- Budget Records Modal -->
+      <div id="budgetRecordsModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal budget-records-modal" role="dialog" aria-modal="true" aria-labelledby="budgetRecordsTitle" aria-describedby="budgetRecordsMeta">
+          <div class="edit-modal-header">
+            <div class="stack-compact budget-records-header">
+              <h3 id="budgetRecordsTitle">Budget Records</h3>
+              <div id="budgetRecordsMeta" class="muted small"></div>
+            </div>
+            <button id="closeBudgetRecordsModal" class="btn btn-secondary btn-small" type="button">✕</button>
+          </div>
+          <div id="budgetRecordsSummary" class="budget-records-summary"></div>
+          <div class="budget-records-filters">
+            <input id="budgetRecordsSearch" class="search" type="search" placeholder="Search by note or date…" />
+            <div class="budget-records-date-filter">
+              <input id="budgetRecordsDateFilter" type="date" title="Filter by date" />
+              <button id="budgetRecordsClearDate" class="btn btn-secondary btn-small" type="button">Clear</button>
+            </div>
+          </div>
+          <div class="table-wrap budget-records-table-wrap">
+            <table class="table" aria-label="Budget records table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th class="right">Amount</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody id="budgetRecordsTbody"></tbody>
+            </table>
+          </div>
+          <div class="pager" aria-label="Budget records pagination">
+            <div id="budgetRecordsPageInfo" class="muted small"></div>
+            <div class="pager-actions">
+              <button id="budgetRecordsPrevBtn" class="btn btn-secondary" type="button">Prev</button>
+              <button id="budgetRecordsNextBtn" class="btn btn-secondary" type="button">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Edit Transaction Modal -->
       <div id="editTxModal" class="edit-modal-overlay" hidden>
         <div class="edit-modal" role="dialog" aria-modal="true" aria-label="Edit Record">

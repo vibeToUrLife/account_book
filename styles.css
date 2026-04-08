@@ -836,12 +836,17 @@ input:focus, select:focus {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .budget-card-actions .btn-small {
   padding: 6px 12px;
   font-size: 12px;
   min-height: auto;
+}
+
+.budget-card-hint {
+  font-size: 11px;
 }
 
 @media (max-width: 400px) {
@@ -1711,6 +1716,63 @@ body {
   font-size: 18px;
   font-weight: 700;
 }
+
+.budget-records-modal {
+  max-width: 760px;
+}
+
+.budget-records-header {
+  gap: 4px;
+}
+
+.budget-records-summary {
+  margin-bottom: 16px;
+}
+
+.budget-records-summary .budget-card-stats {
+  gap: 8px;
+}
+
+.budget-records-stat {
+  padding: 12px;
+  background: var(--stat-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.budget-records-table-wrap {
+  max-height: 48vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.budget-records-modal .pager {
+  margin-top: 12px;
+}
+
+.budget-records-modal .search {
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-records-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.budget-records-filters .search {
+  flex: 1;
+  min-width: 140px;
+}
+
+.budget-records-date-filter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1955,6 +2017,47 @@ body {
   #receiptModal .edit-modal {
     width: 100%;
     max-width: 100%;
+  }
+
+  /* Budget records modal mobile tweaks */
+  .budget-records-modal {
+    max-width: 100%;
+  }
+  .budget-records-table-wrap {
+    max-height: 40vh;
+  }
+  .budget-records-modal .pager {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .budget-records-modal .pager .pager-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .budget-records-modal .pager .pager-actions .btn {
+    flex: 1;
+    text-align: center;
+  }
+  .budget-records-summary .budget-card-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .budget-records-stat {
+    padding: 8px;
+    font-size: 13px;
+  }
+  .budget-records-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .budget-records-filters .search {
+    min-width: 0;
+    width: 100%;
+  }
+  .budget-records-date-filter {
+    width: 100%;
+  }
+  .budget-records-date-filter input[type="date"] {
+    flex: 1;
   }
 
   /* Dashboard cards: 2 cols on small tablets, stack nicely */

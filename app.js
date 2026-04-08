@@ -122,6 +122,19 @@ const els = {
   editTxCancelBtn: document.getElementById("editTxCancelBtn"),
   closeEditModal: document.getElementById("closeEditModal"),
 
+  budgetRecordsModal: document.getElementById("budgetRecordsModal"),
+  budgetRecordsTitle: document.getElementById("budgetRecordsTitle"),
+  budgetRecordsMeta: document.getElementById("budgetRecordsMeta"),
+  budgetRecordsSummary: document.getElementById("budgetRecordsSummary"),
+  budgetRecordsTbody: document.getElementById("budgetRecordsTbody"),
+  closeBudgetRecordsModal: document.getElementById("closeBudgetRecordsModal"),
+  budgetRecordsSearch: document.getElementById("budgetRecordsSearch"),
+  budgetRecordsPageInfo: document.getElementById("budgetRecordsPageInfo"),
+  budgetRecordsPrevBtn: document.getElementById("budgetRecordsPrevBtn"),
+  budgetRecordsNextBtn: document.getElementById("budgetRecordsNextBtn"),
+  budgetRecordsDateFilter: document.getElementById("budgetRecordsDateFilter"),
+  budgetRecordsClearDate: document.getElementById("budgetRecordsClearDate"),
+
   autoCategorySuggestion: document.getElementById("autoCategorySuggestion"),
   scanReceiptBtn: document.getElementById("scanReceiptBtn"),
   receiptModal: document.getElementById("receiptModal"),
@@ -149,6 +162,11 @@ let statsChartInstance = null;
 let editingCategoryId = null;
 let editingTransactionId = null;
 let lastUsedCategoryId = null;
+let openBudgetRecordsCategoryId = "";
+let budgetRecordsPage = 1;
+let budgetRecordsSearchTerm = "";
+let budgetRecordsDateFilter = "";
+const BUDGET_RECORDS_PAGE_SIZE = 10;
 
 // User settings
 let currencySymbol = "";
@@ -289,6 +307,73 @@ function budgetMonthRefDate() {
   const d = new Date(y, (m || 1) - 1, 1);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function budgetReferenceDateForPeriod(budgetPeriod) {
+  if (budgetPeriod !== "month" && budgetPeriod !== "year") return null;
+
+  const monthRefDate = budgetMonthRefDate();
+  if (budgetPeriod === "year") {
+    const yearRefDate = new Date(monthRefDate.getFullYear(), 0, 1);
+    yearRefDate.setHours(0, 0, 0, 0);
+    return yearRefDate;
+  }
+
+  return monthRefDate;
+}
+
+function budgetRangeForPeriod(budgetPeriod, referenceDate) {
+  if (budgetPeriod === "month") {
+    const ref = referenceDate || new Date();
+    const start = startOfMonth(ref);
+    const endExclusive = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    return {
+      start,
+      endExclusive,
+      periodLabel: "Monthly",
+      scopeLabel: currentMonthValue(start),
+      rangeLabel: `${dateObjToISO(start)} → ${dateObjToISO(addDays(endExclusive, -1))}`,
+    };
+  }
+
+  if (budgetPeriod === "year") {
+    const ref = referenceDate || new Date();
+    const start = startOfYear(ref);
+    const endExclusive = new Date(start.getFullYear() + 1, 0, 1);
+    return {
+      start,
+      endExclusive,
+      periodLabel: "Yearly",
+      scopeLabel: String(start.getFullYear()),
+      rangeLabel: `${dateObjToISO(start)} → ${dateObjToISO(addDays(endExclusive, -1))}`,
+    };
+  }
+
+  return {
+    start: null,
+    endExclusive: null,
+    periodLabel: "Lifetime",
+    scopeLabel: "All time",
+    rangeLabel: "All records",
+  };
+}
+
+function isTransactionInBudgetRange(tx, budgetRange) {
+  if (!budgetRange.start || !budgetRange.endExclusive) return true;
+  if (!tx?.dateISO) return false;
+
+  const d = new Date(tx.dateISO);
+  return d >= budgetRange.start && d < budgetRange.endExclusive;
+}
+
+function getBudgetTransactions(categoryId, budgetRange) {
+  return transactions
+    .filter((tx) => tx.categoryId === categoryId && isTransactionInBudgetRange(tx, budgetRange))
+    .sort((a, b) => {
+      const ta = a?.dateISO ? new Date(a.dateISO).getTime() : 0;
+      const tb = b?.dateISO ? new Date(b.dateISO).getTime() : 0;
+      return tb - ta;
+    });
 }
 
 function parsePositiveAmount(value) {
@@ -793,30 +878,16 @@ function computeCategoryTotals(categoryId, budgetPeriod, referenceDate) {
   let spent = 0;
   let income = 0;
 
-  let start = null;
-  let endExclusive = null;
-  if (budgetPeriod === "month") {
-    const ref = referenceDate || new Date();
-    start = startOfMonth(ref);
-    endExclusive = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-  } else if (budgetPeriod === "year") {
-    const ref = referenceDate || new Date();
-    start = startOfYear(ref);
-    endExclusive = new Date(start.getFullYear() + 1, 0, 1);
-  }
+  const budgetRange = budgetRangeForPeriod(budgetPeriod, referenceDate);
 
   for (const tx of transactions) {
     if (tx.categoryId !== categoryId) continue;
-
-    if (start && endExclusive) {
-      const d = new Date(tx.dateISO);
-      if (!(d >= start && d < endExclusive)) continue;
-    }
+    if (!isTransactionInBudgetRange(tx, budgetRange)) continue;
 
     if (tx.type === "expense") spent += tx.amount;
     else income += tx.amount;
   }
-  return { spent, income, balance: income - spent };
+  return { spent, income, balance: income - spent, budgetRange };
 }
 
 function renderCategorySelect() {
@@ -857,20 +928,13 @@ function renderCategoriesTable() {
     return;
   }
 
-  const monthRefDate = budgetMonthRefDate();
-  const monthLabel = els.budgetMonth.value || currentMonthValue();
-
-  const selectedYear = monthRefDate.getFullYear();
-  const yearRefDate = new Date(selectedYear, 0, 1);
-  yearRefDate.setHours(0, 0, 0, 0);
-  const yearLabel = String(selectedYear);
-
   for (const c of categories) {
     const period = c.budgetPeriod || "month";
+    const referenceDate = budgetReferenceDateForPeriod(period);
     const { spent, income, balance } = computeCategoryTotals(
       c.id,
       period,
-      period === "month" ? monthRefDate : period === "year" ? yearRefDate : null
+      referenceDate
     );
     const effectiveBudgetBalance = (c.budget || 0) + balance;
 
@@ -902,6 +966,8 @@ function renderCategoriesTable() {
     const tr = document.createElement("tr");
     tr.dataset.categoryId = c.id;
     tr.classList.add("clickable-row", statusClass, "budget-card-row");
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-label", `${c.name} budget. Press Enter to view records.`);
     if (c.id === activeCategoryId) tr.classList.add("selected");
 
     const progressHtml = hasBudget ? `
@@ -934,6 +1000,7 @@ function renderCategoriesTable() {
           </div>
           ${progressHtml}
           ${statsHtml}
+          <div class="budget-card-hint muted small">Click card to view records in this budget.</div>
           <div class="budget-card-actions">
             <button class="btn btn-small" type="button" data-action="edit-category" data-id="${c.id}">Edit</button>
             <button class="btn btn-danger btn-small" type="button" data-action="delete-category" data-id="${c.id}">Delete</button>
@@ -1116,6 +1183,7 @@ function renderAll() {
     renderCategorySelect();
     renderCategoriesTable();
     renderTransactionsTable();
+    syncBudgetRecordsModal();
     renderStats();
     updateNoteSuggestions();
     renderQuickRepeat();
@@ -1455,6 +1523,168 @@ function closeEditModal() {
   els.editTxModal.hidden = true;
   editingTransactionId = null;
   els.editTxForm.reset();
+}
+
+function renderBudgetRecordsModal(category) {
+  if (
+    !els.budgetRecordsTitle ||
+    !els.budgetRecordsMeta ||
+    !els.budgetRecordsSummary ||
+    !els.budgetRecordsTbody
+  ) {
+    return;
+  }
+
+  const period = category.budgetPeriod || "month";
+  const referenceDate = budgetReferenceDateForPeriod(period);
+  const { spent, income, balance, budgetRange } = computeCategoryTotals(
+    category.id,
+    period,
+    referenceDate
+  );
+  const effectiveBudgetBalance = (category.budget || 0) + balance;
+  const allBudgetTransactions = getBudgetTransactions(category.id, budgetRange);
+  const recordLabel = allBudgetTransactions.length === 1 ? "1 record" : `${allBudgetTransactions.length} records`;
+  const hasBudget = (category.budget || 0) > 0;
+  const summaryValue = hasBudget ? effectiveBudgetBalance : balance;
+  const summaryItems = [
+    {
+      label: "Budget",
+      value: hasBudget ? money(category.budget) : "No limit",
+      className: "",
+    },
+    {
+      label: "Spent",
+      value: money(spent),
+      className: "val-negative",
+    },
+    {
+      label: "Income",
+      value: money(income),
+      className: "val-positive",
+    },
+    {
+      label: hasBudget ? "Balance" : "Net",
+      value: money(summaryValue),
+      className: summaryValue > 0 ? "val-positive" : summaryValue < 0 ? "val-negative" : "",
+    },
+  ];
+
+  els.budgetRecordsTitle.textContent = `${category.name} Records`;
+  els.budgetRecordsMeta.textContent = `${budgetRange.periodLabel} • ${budgetRange.rangeLabel} • ${recordLabel}`;
+  els.budgetRecordsSummary.innerHTML = `
+    <div class="budget-card-stats">
+      ${summaryItems
+        .map(
+          (item) => `
+            <div class="budget-stat budget-records-stat">
+              <span class="budget-stat-label">${escapeHtml(item.label)}</span>
+              <span class="budget-stat-val ${item.className}">${escapeHtml(item.value)}</span>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+
+  // Filter by search term and date
+  const term = budgetRecordsSearchTerm.toLowerCase();
+  const dateFilter = budgetRecordsDateFilter;
+  const filtered = allBudgetTransactions.filter((tx) => {
+    if (term) {
+      const note = (tx.note || "").toLowerCase();
+      const date = (tx.dateISO || "").toLowerCase();
+      if (!note.includes(term) && !date.includes(term)) return false;
+    }
+    if (dateFilter && tx.dateISO !== dateFilter) return false;
+    return true;
+  });
+
+  // Pagination
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / BUDGET_RECORDS_PAGE_SIZE));
+  budgetRecordsPage = clamp(budgetRecordsPage, 1, totalPages);
+
+  if (els.budgetRecordsPrevBtn) els.budgetRecordsPrevBtn.disabled = budgetRecordsPage <= 1;
+  if (els.budgetRecordsNextBtn) els.budgetRecordsNextBtn.disabled = budgetRecordsPage >= totalPages;
+  if (els.budgetRecordsPageInfo) {
+    if (total === 0) {
+      const hint = term || dateFilter ? "No matching records." : "";
+      els.budgetRecordsPageInfo.textContent = hint;
+    } else {
+      const start = (budgetRecordsPage - 1) * BUDGET_RECORDS_PAGE_SIZE + 1;
+      const end = Math.min(budgetRecordsPage * BUDGET_RECORDS_PAGE_SIZE, total);
+      const filters = [];
+      if (term) filters.push(`"${budgetRecordsSearchTerm}"`);
+      if (dateFilter) filters.push(dateFilter);
+      const filterInfo = filters.length ? ` • Filter: ${filters.join(", ")}` : "";
+      els.budgetRecordsPageInfo.textContent = `Showing ${start}-${end} of ${total} (Page ${budgetRecordsPage}/${totalPages})${filterInfo}`;
+    }
+  }
+
+  els.budgetRecordsTbody.innerHTML = "";
+
+  if (total === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="4" class="muted">${term || dateFilter ? "No matching records." : "No records in this budget range yet."}</td>`;
+    els.budgetRecordsTbody.appendChild(tr);
+    return;
+  }
+
+  const startIndex = (budgetRecordsPage - 1) * BUDGET_RECORDS_PAGE_SIZE;
+  const pageItems = filtered.slice(startIndex, startIndex + BUDGET_RECORDS_PAGE_SIZE);
+
+  for (const tx of pageItems) {
+    const tr = document.createElement("tr");
+    const typeLabel = tx.type === "expense" ? "Expense" : "Revenue";
+    const amountClass = tx.type === "expense" ? "val-negative" : "val-positive";
+
+    tr.innerHTML = `
+      <td data-label="Date">${escapeHtml(tx.dateISO || "")}</td>
+      <td data-label="Type">${escapeHtml(typeLabel)}</td>
+      <td class="right ${amountClass}" data-label="Amount">${escapeHtml(money(tx.amount))}</td>
+      <td data-label="Note">${escapeHtml(tx.note || "")}</td>
+    `;
+    els.budgetRecordsTbody.appendChild(tr);
+  }
+}
+
+function openBudgetRecordsModal(categoryId) {
+  if (!els.budgetRecordsModal) return;
+
+  const category = categories.find((c) => c.id === categoryId);
+  if (!category) return;
+
+  openBudgetRecordsCategoryId = categoryId;
+  budgetRecordsPage = 1;
+  budgetRecordsSearchTerm = "";
+  budgetRecordsDateFilter = "";
+  if (els.budgetRecordsSearch) els.budgetRecordsSearch.value = "";
+  if (els.budgetRecordsDateFilter) els.budgetRecordsDateFilter.value = "";
+  renderBudgetRecordsModal(category);
+  els.budgetRecordsModal.hidden = false;
+}
+
+function closeBudgetRecordsModal() {
+  if (els.budgetRecordsModal) els.budgetRecordsModal.hidden = true;
+  openBudgetRecordsCategoryId = "";
+  budgetRecordsSearchTerm = "";
+  budgetRecordsDateFilter = "";
+  budgetRecordsPage = 1;
+  if (els.budgetRecordsSearch) els.budgetRecordsSearch.value = "";
+  if (els.budgetRecordsDateFilter) els.budgetRecordsDateFilter.value = "";
+}
+
+function syncBudgetRecordsModal() {
+  if (!els.budgetRecordsModal || els.budgetRecordsModal.hidden || !openBudgetRecordsCategoryId) return;
+
+  const category = categories.find((c) => c.id === openBudgetRecordsCategoryId);
+  if (!category) {
+    closeBudgetRecordsModal();
+    return;
+  }
+
+  renderBudgetRecordsModal(category);
 }
 
 async function saveEditModal() {
@@ -2330,6 +2560,9 @@ function wireAssistantEvents() {
     if (e.key === "Escape") {
       if (els.assistantPanel && !els.assistantPanel.hidden) {
         toggleAssistantPanel(false);
+      }
+      if (els.budgetRecordsModal && !els.budgetRecordsModal.hidden) {
+        closeBudgetRecordsModal();
       }
       if (els.editTxModal && !els.editTxModal.hidden) {
         closeEditModal();
@@ -3452,22 +3685,19 @@ function wireEvents() {
     const id = row?.dataset?.categoryId;
     if (!id) return;
 
-    activeCategoryId = activeCategoryId === id ? "" : id;
-    txPage = 1;
-    renderCategoriesTable();
-    renderTransactionsTable();
+    openBudgetRecordsModal(id);
+  });
 
-    // Mobile convenience: jump to the records section after selecting a category.
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia &&
-      window.matchMedia("(max-width: 979px)").matches
-    ) {
-      const recordCard = document.querySelector(".record-card");
-      if (recordCard && typeof recordCard.scrollIntoView === "function") {
-        recordCard.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }
+  els.categoryTbody.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    if (e.target.closest("button")) return;
+
+    const row = e.target.closest("tr[data-category-id]");
+    const id = row?.dataset?.categoryId;
+    if (!id) return;
+
+    e.preventDefault();
+    openBudgetRecordsModal(id);
   });
 
   els.txForm.addEventListener("submit", async (e) => {
@@ -3563,9 +3793,58 @@ function wireEvents() {
   if (els.closeEditModal) {
     els.closeEditModal.addEventListener("click", closeEditModal);
   }
+  if (els.closeBudgetRecordsModal) {
+    els.closeBudgetRecordsModal.addEventListener("click", closeBudgetRecordsModal);
+  }
   if (els.editTxCancelBtn) {
     els.editTxCancelBtn.addEventListener("click", closeEditModal);
   }
+  if (els.budgetRecordsModal) {
+    els.budgetRecordsModal.addEventListener("click", (e) => {
+      if (e.target === els.budgetRecordsModal) closeBudgetRecordsModal();
+    });
+  }
+
+  // Budget records modal search & pagination
+  if (els.budgetRecordsSearch) {
+    let budgetSearchTimer;
+    els.budgetRecordsSearch.addEventListener("input", () => {
+      clearTimeout(budgetSearchTimer);
+      budgetSearchTimer = setTimeout(() => {
+        budgetRecordsSearchTerm = els.budgetRecordsSearch.value.trim();
+        budgetRecordsPage = 1;
+        syncBudgetRecordsModal();
+      }, 200);
+    });
+  }
+  if (els.budgetRecordsPrevBtn) {
+    els.budgetRecordsPrevBtn.addEventListener("click", () => {
+      budgetRecordsPage = Math.max(1, budgetRecordsPage - 1);
+      syncBudgetRecordsModal();
+    });
+  }
+  if (els.budgetRecordsNextBtn) {
+    els.budgetRecordsNextBtn.addEventListener("click", () => {
+      budgetRecordsPage += 1;
+      syncBudgetRecordsModal();
+    });
+  }
+  if (els.budgetRecordsDateFilter) {
+    els.budgetRecordsDateFilter.addEventListener("change", () => {
+      budgetRecordsDateFilter = els.budgetRecordsDateFilter.value;
+      budgetRecordsPage = 1;
+      syncBudgetRecordsModal();
+    });
+  }
+  if (els.budgetRecordsClearDate) {
+    els.budgetRecordsClearDate.addEventListener("click", () => {
+      budgetRecordsDateFilter = "";
+      if (els.budgetRecordsDateFilter) els.budgetRecordsDateFilter.value = "";
+      budgetRecordsPage = 1;
+      syncBudgetRecordsModal();
+    });
+  }
+
   if (els.editTxModal) {
     els.editTxModal.addEventListener("click", (e) => {
       if (e.target === els.editTxModal) closeEditModal();
@@ -3622,6 +3901,7 @@ function wireEvents() {
   els.budgetMonth.addEventListener("change", () => {
     renderBudgetScopeLabel();
     renderCategoriesTable();
+    syncBudgetRecordsModal();
   });
 
   // Duplicate detection on form input changes
