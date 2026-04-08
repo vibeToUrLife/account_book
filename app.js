@@ -176,6 +176,11 @@ let unsubSettings = null;
 let unsubGoals = null;
 let unsubRecurring = null;
 
+// Auto-run recurring tracking
+let _recurringLoaded = false;
+let _transactionsLoaded = false;
+let _hasAutoRunRecurring = false;
+
 async function ensureChartJs() {
   if (ChartJs) return ChartJs;
 
@@ -1230,7 +1235,9 @@ async function startListenersForUser(userId) {
   // Listen to recurring rules
   unsubRecurring = onSnapshot(query(recurringCol, orderBy("createdAt", "asc")), (snap) => {
     recurringRules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    _recurringLoaded = true;
     renderRecurringRules();
+    autoRunDueRecurring();
   });
 
   unsubCategories = onSnapshot(query(categoriesCol, orderBy("createdAt", "asc")), (snap) => {
@@ -1256,6 +1263,8 @@ async function startListenersForUser(userId) {
     ensureStatsYearOptions();
     renderBudgetScopeLabel();
     renderAll();
+    _transactionsLoaded = true;
+    autoRunDueRecurring();
   });
 }
 
@@ -1280,6 +1289,9 @@ function setSignedOutUi() {
   savingsGoals = [];
   recurringRules = [];
   currencySymbol = "";
+  _recurringLoaded = false;
+  _transactionsLoaded = false;
+  _hasAutoRunRecurring = false;
   activeCategoryId = "";
   txPage = 1;
   setAppError("");
@@ -3197,6 +3209,43 @@ async function addRecurringRule() {
 async function deleteRecurringRule(ruleId) {
   const { recurring: recurringCol } = userCollections(uid);
   await deleteDoc(doc(recurringCol, ruleId));
+}
+
+async function autoRunDueRecurring() {
+  if (_hasAutoRunRecurring) return;
+  if (!_recurringLoaded || !_transactionsLoaded) return;
+  _hasAutoRunRecurring = true;
+
+  if (recurringRules.length === 0) return;
+
+  const today = new Date();
+  const dayOfMonth = today.getDate();
+  const dateISO = todayISO();
+
+  const due = recurringRules.filter((r) => (r.dayOfMonth || 1) === dayOfMonth);
+  if (due.length === 0) return;
+
+  const { transactions: txCol } = userCollections(uid);
+  let count = 0;
+  for (const r of due) {
+    const alreadyDone = transactions.some((t) => t.dateISO === dateISO && t.categoryId === r.categoryId && t.amount === r.amount && (t.note || "") === (r.note || ""));
+    if (alreadyDone) continue;
+
+    await addDoc(txCol, {
+      categoryId: r.categoryId,
+      categoryName: r.categoryName || "(Unknown)",
+      type: r.type,
+      amount: r.amount,
+      note: r.note || "",
+      noteLower: (r.note || "").toLowerCase(),
+      dateISO,
+      createdAt: serverTimestamp(),
+    });
+    count++;
+  }
+  if (count > 0) {
+    showUndoToast({ message: `🔁 Auto-added ${count} recurring transaction(s).`, onUndo: () => {} });
+  }
 }
 
 async function runDueRecurring() {
