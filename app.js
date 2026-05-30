@@ -9,6 +9,21 @@ import {
   firestoreApi,
 } from "./firebase.js";
 
+import {
+  todayISO,
+  dateObjToISO,
+  currentMonthValue,
+  startOfWeek,
+  startOfMonth,
+  startOfYear,
+  addDays,
+  debounce,
+  parsePositiveAmount,
+  normalizeText,
+  clamp,
+  escapeHtml,
+} from "./utils.js";
+
 const {
   addDoc,
   deleteDoc,
@@ -75,6 +90,14 @@ const els = {
   searchInput: document.getElementById("searchInput"),
   clearSearchBtn: document.getElementById("clearSearchBtn"),
   exportCsvBtn: document.getElementById("exportCsvBtn"),
+  filterDateFrom: document.getElementById("filterDateFrom"),
+  filterDateTo: document.getElementById("filterDateTo"),
+  filterType: document.getElementById("filterType"),
+  filterCategory: document.getElementById("filterCategory"),
+  filterMinAmount: document.getElementById("filterMinAmount"),
+  filterMaxAmount: document.getElementById("filterMaxAmount"),
+  clearFiltersBtn: document.getElementById("clearFiltersBtn"),
+  filterSummary: document.getElementById("filterSummary"),
   todayBtn: document.getElementById("todayBtn"),
   noteSuggestions: document.getElementById("noteSuggestions"),
   duplicateWarning: document.getElementById("duplicateWarning"),
@@ -89,6 +112,7 @@ const els = {
 
   assistantFab: document.getElementById("assistantFab"),
   assistantPanel: document.getElementById("assistantPanel"),
+  quickAddFab: document.getElementById("quickAddFab"),
   closeAssistant: document.getElementById("closeAssistant"),
   assistantChat: document.getElementById("assistantChat"),
   assistantInput: document.getElementById("assistantInput"),
@@ -285,27 +309,6 @@ function money(n) {
   return `${currencySymbol}${v.toFixed(2)}`;
 }
 
-function todayISO() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function dateObjToISO(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function currentMonthValue(date = new Date()) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
-
 function budgetMonthRefDate() {
   const monthValue = els.budgetMonth.value || currentMonthValue();
   const [y, m] = monthValue.split("-").map((x) => Number(x));
@@ -379,53 +382,6 @@ function getBudgetTransactions(categoryId, budgetRange) {
       const tb = b?.dateISO ? new Date(b.dateISO).getTime() : 0;
       return tb - ta;
     });
-}
-
-function parsePositiveAmount(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 100) / 100;
-}
-
-function normalizeText(s) {
-  return String(s || "").trim();
-}
-
-function startOfWeek(date) {
-  // Week starts Monday
-  const d = new Date(date);
-  const day = (d.getDay() + 6) % 7; // Mon=0
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - day);
-  return d;
-}
-
-function startOfMonth(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(1);
-  return d;
-}
-
-function startOfYear(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setMonth(0, 1);
-  return d;
-}
-
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function debounce(fn, ms) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
-  };
 }
 
 function setStatsRangeLabel(range, start, endExclusive) {
@@ -595,30 +551,6 @@ async function renderStatsChart(range, start, endExclusive) {
   }
 }
 
-function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function rangeFor(anchorISO, range) {
-  // Back-compat (unused). Prefer rangeForUi(range).
-  const anchor = new Date(anchorISO);
-  const start =
-    range === "week"
-      ? startOfWeek(anchor)
-      : range === "month"
-        ? startOfMonth(anchor)
-        : startOfYear(anchor);
-  const endExclusive =
-    range === "week"
-      ? addDays(start, 7)
-      : range === "month"
-        ? new Date(start.getFullYear(), start.getMonth() + 1, 1)
-        : new Date(start.getFullYear() + 1, 0, 1);
-  return { start, endExclusive };
-}
-
 function yearsWithRecords() {
   const set = new Set();
   for (const tx of transactions) {
@@ -707,12 +639,18 @@ let transactions = [];
 let searchTerm = "";
 let activeCategoryId = "";
 
+// Advanced Record List filters
+let filters = {
+  dateFrom: "",
+  dateTo: "",
+  type: "",
+  category: "",
+  minAmount: "",
+  maxAmount: "",
+};
+
 const TX_PAGE_SIZE = 10;
 let txPage = 1;
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
 
 function setWarning(text) {
   els.configWarning.textContent = text;
@@ -950,22 +888,28 @@ function renderCategoriesTable() {
           ? `Yearly`
           : "Lifetime";
 
-    const budgetUsedPct = (c.budget || 0) > 0 ? Math.min((spent / (c.budget || 1)) * 100, 100) : 0;
+    const hasBudget = (c.budget || 0) > 0;
+    // Raw (uncapped) percentage so we can tell "fully used" (=100%) apart from "over" (>100%).
+    const rawUsedPct = hasBudget ? (spent / (c.budget || 1)) * 100 : 0;
+    const budgetUsedPct = Math.min(rawUsedPct, 100); // for the progress bar width
+    const overAmount = spent - (c.budget || 0);
     let statusClass = 'budget-ok';
     let statusLabel = '';
-    if ((c.budget || 0) > 0 && spent > 0) {
-      if (budgetUsedPct >= 100) {
+    if (hasBudget && spent > 0) {
+      if (rawUsedPct > 100) {
         statusClass = 'budget-over';
-        statusLabel = '<span class="budget-badge over">OVER BUDGET</span>';
-      } else if (budgetUsedPct >= 80) {
+        statusLabel = `<span class="budget-badge over">Over by ${money(overAmount)}</span>`;
+      } else if (rawUsedPct >= 100) {
+        statusClass = 'budget-full';
+        statusLabel = '<span class="budget-badge full">Fully used</span>';
+      } else if (rawUsedPct >= 80) {
         statusClass = 'budget-warn';
-        statusLabel = `<span class="budget-badge warn">${Math.round(budgetUsedPct)}% used</span>`;
+        statusLabel = `<span class="budget-badge warn">${Math.round(rawUsedPct)}% used</span>`;
       }
     }
 
-    const hasBudget = (c.budget || 0) > 0;
-    const progressColor = budgetUsedPct >= 100 ? 'var(--danger)' : budgetUsedPct >= 80 ? 'var(--warning)' : 'var(--primary)';
-    const pctDisplay = hasBudget ? Math.round(budgetUsedPct) : 0;
+    const progressColor = rawUsedPct > 100 ? 'var(--danger)' : rawUsedPct >= 100 ? 'var(--primary-strong, var(--primary))' : rawUsedPct >= 80 ? 'var(--warning)' : 'var(--primary)';
+    const pctDisplay = hasBudget ? Math.round(rawUsedPct) : 0;
     const net = income - spent;
 
     const tr = document.createElement("tr");
@@ -978,7 +922,7 @@ function renderCategoriesTable() {
     const progressHtml = hasBudget ? `
           <div class="budget-progress-wrap">
             <div class="budget-progress-bar">
-              <div class="budget-progress-fill" style="width:${pctDisplay}%;background:${progressColor}"></div>
+              <div class="budget-progress-fill" style="width:${Math.round(budgetUsedPct)}%;background:${progressColor}"></div>
             </div>
             <div class="budget-progress-label">${pctDisplay}%</div>
           </div>` : '';
@@ -1017,6 +961,55 @@ function renderCategoriesTable() {
   }
 }
 
+// Applies the advanced Record List filters (date range, type, category, amount).
+function applyAdvancedFilters(list) {
+  const { dateFrom, dateTo, type, category, minAmount, maxAmount } = filters;
+  const min = minAmount !== "" ? parseFloat(minAmount) : null;
+  const max = maxAmount !== "" ? parseFloat(maxAmount) : null;
+  return list.filter((t) => {
+    if (dateFrom && t.dateISO < dateFrom) return false;
+    if (dateTo && t.dateISO > dateTo) return false;
+    if (type && t.type !== type) return false;
+    if (category && t.categoryId !== category) return false;
+    if (min !== null && !isNaN(min) && t.amount < min) return false;
+    if (max !== null && !isNaN(max) && t.amount > max) return false;
+    return true;
+  });
+}
+
+function updateFilterSummary() {
+  if (!els.filterSummary) return;
+  const parts = [];
+  if (filters.dateFrom || filters.dateTo) {
+    parts.push(`${filters.dateFrom || "…"} → ${filters.dateTo || "…"}`);
+  }
+  if (filters.type) parts.push(filters.type);
+  if (filters.category) {
+    const cat = categories.find((c) => c.id === filters.category);
+    if (cat) parts.push(cat.name);
+  }
+  if (filters.minAmount) parts.push(`≥ ${filters.minAmount}`);
+  if (filters.maxAmount) parts.push(`≤ ${filters.maxAmount}`);
+  els.filterSummary.textContent = parts.length ? `Active: ${parts.join(" • ")}` : "";
+}
+
+// Keeps the category filter dropdown in sync with the category list.
+function renderFilterCategoryOptions() {
+  if (!els.filterCategory) return;
+  const current = filters.category;
+  els.filterCategory.innerHTML =
+    '<option value="">All</option>' +
+    categories
+      .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+      .join("");
+  // Restore selection if the category still exists.
+  if (current && categories.some((c) => c.id === current)) {
+    els.filterCategory.value = current;
+  } else {
+    filters.category = "";
+  }
+}
+
 function renderTransactionsTable() {
   /* Preserve min-height to prevent scroll jump when content changes */
   const tableWrap = els.txTbody.closest(".table-wrap");
@@ -1036,6 +1029,9 @@ function renderTransactionsTable() {
   if (activeCategoryId) {
     filtered = filtered.filter((t) => t.categoryId === activeCategoryId);
   }
+
+  filtered = applyAdvancedFilters(filtered);
+  updateFilterSummary();
 
   // Sort transactions by date (newest first). Work on a copy to avoid mutating the
   // original `transactions` array in-place.
@@ -1186,6 +1182,7 @@ function renderAll() {
   queueMicrotask(() => {
     renderAllPending = false;
     renderCategorySelect();
+    renderFilterCategoryOptions();
     renderCategoriesTable();
     renderTransactionsTable();
     syncBudgetRecordsModal();
@@ -1196,15 +1193,6 @@ function renderAll() {
     renderSavingsGoals();
     renderRecurringRules();
   });
-}
-
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 async function startListenersForUser(userId) {
@@ -1304,6 +1292,7 @@ function setSignedOutUi() {
   els.signOutBtn.disabled = true;
   if (els.assistantFab) els.assistantFab.hidden = true;
   if (els.assistantPanel) els.assistantPanel.hidden = true;
+  if (els.quickAddFab) els.quickAddFab.hidden = true;
 }
 
 async function setSignedInUi(user) {
@@ -1312,6 +1301,7 @@ async function setSignedInUi(user) {
   els.appContent.hidden = false;
   els.signOutBtn.disabled = false;
   if (els.assistantFab) els.assistantFab.hidden = false;
+  if (els.quickAddFab) els.quickAddFab.hidden = false;
   setAuthError("");
   setAppError("");
   await startListenersForUser(uid);
@@ -1455,7 +1445,8 @@ async function addTransaction() {
   });
 
   lastUsedCategoryId = categoryId;
-  els.txAmount.value = "";
+  if (els.txAmount._bankPrefill) els.txAmount._bankPrefill(0);
+  else els.txAmount.value = "";
   els.txNote.value = "";
   if (els.duplicateWarning) els.duplicateWarning.hidden = true;
   els.txAmount.focus();
@@ -1493,20 +1484,6 @@ async function updateTransaction() {
   txPage = 1;
 }
 
-function startTxEdit(id) {
-  const tx = transactions.find((t) => t.id === id);
-  if (!tx) return;
-  editingTransactionId = id;
-  els.txCategory.value = tx.categoryId || "";
-  els.txType.value = tx.type || "expense";
-  els.txAmount.value = tx.amount != null ? String(tx.amount) : "";
-  els.txNote.value = tx.note || "";
-  els.txDate.value = tx.dateISO || todayISO();
-  if (els.txSubmitBtn) els.txSubmitBtn.textContent = "Save";
-  if (els.cancelTxEdit) els.cancelTxEdit.hidden = false;
-  els.txAmount.focus();
-}
-
 function openEditModal(id) {
   const tx = transactions.find((t) => t.id === id);
   if (!tx) return;
@@ -1523,7 +1500,8 @@ function openEditModal(id) {
 
   els.editTxCategory.value = tx.categoryId || "";
   els.editTxType.value = tx.type || "expense";
-  els.editTxAmount.value = tx.amount != null ? String(tx.amount) : "";
+  if (els.editTxAmount._bankPrefill) els.editTxAmount._bankPrefill(tx.amount);
+  else els.editTxAmount.value = tx.amount != null ? String(tx.amount) : "";
   els.editTxNote.value = tx.note || "";
   els.editTxDate.value = tx.dateISO || todayISO();
 
@@ -2602,34 +2580,49 @@ function checkDuplicate() {
 }
 
 /* ─── Smart Auto-Categorization ─── */
+// Learns the note → category mapping from past transactions, weighting recent
+// records and exact-token matches more heavily so suggestions improve over time.
 function suggestCategoryFromNote(noteText) {
   const text = (noteText || "").trim().toLowerCase();
   if (!text || text.length < 2) return null;
 
-  // Build frequency map: for each category, count how many past transactions have similar notes
+  const inputWords = text.split(/\s+/).filter((w) => w.length >= 2);
+  const now = Date.now();
+  const HALF_LIFE_DAYS = 60; // recent habits matter more than old ones
+
   const scores = new Map();
+  let totalScore = 0;
+
   for (const tx of transactions) {
-    const txNote = (tx.note || "").toLowerCase();
+    const txNote = (tx.note || "").trim().toLowerCase();
     if (!txNote) continue;
-    // Check if the note text overlaps with the current input
-    if (txNote.includes(text) || text.includes(txNote)) {
-      const catId = tx.categoryId;
-      scores.set(catId, (scores.get(catId) || 0) + 2); // exact-ish match
+
+    // Recency weight: decays toward ~0.5 after HALF_LIFE_DAYS.
+    const txTime = tx.dateISO ? new Date(tx.dateISO).getTime() : now;
+    const ageDays = Math.max(0, (now - txTime) / 86400000);
+    const recency = Math.pow(0.5, ageDays / HALF_LIFE_DAYS); // 1 → 0
+
+    let match = 0;
+    if (txNote === text) {
+      match = 5; // identical note: strongest signal
+    } else if (txNote.includes(text) || text.includes(txNote)) {
+      match = 3; // substring match
     } else {
-      // Word-level overlap
-      const inputWords = text.split(/\s+/);
       const noteWords = txNote.split(/\s+/);
-      const overlap = inputWords.filter((w) => w.length >= 2 && noteWords.some((nw) => nw.includes(w) || w.includes(nw)));
-      if (overlap.length > 0) {
-        const catId = tx.categoryId;
-        scores.set(catId, (scores.get(catId) || 0) + overlap.length);
-      }
+      const overlap = inputWords.filter((w) =>
+        noteWords.some((nw) => nw === w || nw.includes(w) || w.includes(nw))
+      );
+      if (overlap.length > 0) match = overlap.length;
     }
+    if (match === 0) continue;
+
+    const weighted = match * (0.5 + recency); // base + recency boost
+    scores.set(tx.categoryId, (scores.get(tx.categoryId) || 0) + weighted);
+    totalScore += weighted;
   }
 
-  if (scores.size === 0) return null;
+  if (scores.size === 0 || totalScore === 0) return null;
 
-  // Pick the category with the highest score
   let bestId = null;
   let bestScore = 0;
   for (const [catId, score] of scores) {
@@ -2639,8 +2632,13 @@ function suggestCategoryFromNote(noteText) {
     }
   }
   if (!bestId) return null;
+
+  // Only suggest when reasonably confident (best option dominates the rest).
+  const confidence = bestScore / totalScore;
+  if (confidence < 0.5) return null;
+
   const cat = categories.find((c) => c.id === bestId);
-  return cat ? { id: cat.id, name: cat.name, score: bestScore } : null;
+  return cat ? { id: cat.id, name: cat.name, score: bestScore, confidence } : null;
 }
 
 function updateAutoCategorySuggestion() {
@@ -2654,7 +2652,7 @@ function updateAutoCategorySuggestion() {
     return;
   }
 
-  els.autoCategorySuggestion.textContent = `💡 Suggest: ${suggestion.name} (click to apply)`;
+  els.autoCategorySuggestion.textContent = `💡 Suggest: ${suggestion.name} (${Math.round(suggestion.confidence * 100)}% match — click to apply)`;
   els.autoCategorySuggestion.hidden = false;
   els.autoCategorySuggestion.onclick = () => {
     els.txCategory.value = suggestion.id;
@@ -2759,8 +2757,10 @@ function generateInsights() {
   }
   if (budgetAlerts.length > 0) {
     const alertItems = budgetAlerts.map((a) => {
-      const cls = a.pct >= 100 ? 'insight-warn' : 'insight-highlight';
-      const label = a.pct >= 100 ? '⚠️ OVER BUDGET' : `⚡ ${a.pct.toFixed(0)}% used`;
+      const cls = a.pct > 100 ? 'insight-warn' : 'insight-highlight';
+      const label = a.pct > 100
+        ? `⚠️ Over by ${money(a.spent - a.budget)}`
+        : a.pct >= 100 ? '✅ Fully used' : `⚡ ${a.pct.toFixed(0)}% used`;
       return `<li>${escapeHtml(a.name)}: ${money(a.spent)} / ${money(a.budget)} — <span class="${cls}">${label}</span></li>`;
     }).join("");
 
@@ -2929,7 +2929,8 @@ async function processReceiptImage(imageSource) {
 
 function applyReceiptToForm() {
   if (receiptExtractedAmount != null) {
-    els.txAmount.value = String(receiptExtractedAmount);
+    if (els.txAmount._bankPrefill) els.txAmount._bankPrefill(receiptExtractedAmount);
+    else els.txAmount.value = String(receiptExtractedAmount);
   }
   if (receiptExtractedText) {
     els.txNote.value = receiptExtractedText;
@@ -2983,23 +2984,49 @@ function renderDashboard() {
     }
   }
 
-  // Budget alerts
+  // Budget alerts (with run-rate forecasting for the current month)
   const dashAlerts = document.getElementById("dashBudgetAlerts");
   if (dashAlerts) {
     const monthRef = budgetMonthRefDate();
+    const now = new Date();
+    const isCurrentMonth =
+      monthRef.getFullYear() === now.getFullYear() &&
+      monthRef.getMonth() === now.getMonth();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
     const alerts = [];
+    const forecasts = [];
     for (const cat of categories) {
       if (!cat.budget || cat.budget <= 0) continue;
       const period = cat.budgetPeriod || "month";
       if (period !== "month") continue;
       const { spent } = computeCategoryTotals(cat.id, period, monthRef);
       const pct = (spent / cat.budget) * 100;
+
       if (pct >= 80) {
-        const label = pct >= 100 ? "⛔ OVER BUDGET" : `⚡ ${Math.round(pct)}% used`;
+        const label = pct > 100
+          ? `⛔ Over by ${money(spent - cat.budget)}`
+          : pct >= 100 ? "✅ Fully used" : `⚡ ${Math.round(pct)}% used`;
         alerts.push(`<div class="dash-alert-item">${escapeHtml(cat.name)}: ${money(spent)} / ${money(cat.budget)} — ${label}</div>`);
       }
+
+      // Forecast: project month-end spend from the current daily run-rate.
+      if (isCurrentMonth && dayOfMonth > 0 && spent > 0 && pct < 100) {
+        const dailyRate = spent / dayOfMonth;
+        const projected = dailyRate * daysInMonth;
+        if (projected > cat.budget) {
+          const crossDay = Math.ceil(cat.budget / dailyRate);
+          const dayText = crossDay <= daysInMonth ? `around day ${crossDay}` : "after month-end";
+          forecasts.push(
+            `<div class="dash-alert-item dash-forecast-item">🔮 ${escapeHtml(cat.name)}: at this rate you'll spend ~${money(projected)} (budget ${money(cat.budget)}) — likely exceed ${dayText}.</div>`
+          );
+        }
+      }
     }
-    dashAlerts.innerHTML = alerts.length > 0 ? alerts.join("") : '<div class="muted small">All budgets are on track. 👍</div>';
+
+    const html = [...alerts, ...forecasts];
+    dashAlerts.innerHTML = html.length > 0 ? html.join("") : '<div class="muted small">All budgets are on track. 👍</div>';
   }
 }
 
@@ -3449,8 +3476,60 @@ function scrollToRecordList() {
   }, 50);
 }
 
+/**
+ * Bank / TNG-style amount input.
+ * Digits shift right through the decimal: typing "1001" shows "10.01".
+ */
+function initBankAmountInput(el) {
+  let cents = 0;
+
+  function fmt(c) {
+    const s = String(c).padStart(3, "0");
+    return s.slice(0, -2) + "." + s.slice(-2);
+  }
+
+  function publish() {
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  el.addEventListener("keydown", (e) => {
+    if (e.key >= "0" && e.key <= "9") {
+      e.preventDefault();
+      if (cents >= 9_999_999) return;
+      cents = cents * 10 + Number(e.key);
+      el.value = cents === 0 ? "" : fmt(cents);
+      publish();
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      cents = Math.floor(cents / 10);
+      el.value = cents === 0 ? "" : fmt(cents);
+      publish();
+    } else if (e.key === "Delete") {
+      e.preventDefault();
+      cents = 0;
+      el.value = "";
+      publish();
+    }
+  });
+
+  // Sync from mobile autofill / paste
+  el.addEventListener("input", () => {
+    const raw = el.value.replace(/[^0-9]/g, "");
+    if (!raw) { cents = 0; el.value = ""; return; }
+    cents = Math.min(Number(raw), 9_999_999);
+    const formatted = fmt(cents);
+    if (el.value !== formatted) el.value = formatted;
+  });
+
+  // Pre-fill from a stored float (e.g. 10.01 → shows "10.01")
+  el._bankPrefill = (val) => {
+    const n = parseFloat(val);
+    cents = isNaN(n) || n <= 0 ? 0 : Math.round(n * 100);
+    el.value = cents === 0 ? "" : fmt(cents);
+  };
+}
+
 function wireEvents() {
-  /* -- Sidebar navigation -- */
   const menuBtn = document.getElementById("menuBtn");
   const sidebar = document.getElementById("sidebar");
   const sidebarOverlay = document.getElementById("sidebarOverlay");
@@ -3522,6 +3601,38 @@ function wireEvents() {
 
   sidebarItems.forEach((item) => {
     item.addEventListener("click", () => switchView(item.dataset.view));
+  });
+
+  /* -- Quick Add floating button + keyboard shortcuts -- */
+  function jumpToAddRecord() {
+    switchView("record");
+    // Focus the note field so the user can start typing immediately.
+    setTimeout(() => {
+      const field = els.txNote || els.txCategory;
+      if (field) field.focus();
+    }, 120);
+  }
+  if (els.quickAddFab) {
+    els.quickAddFab.addEventListener("click", jumpToAddRecord);
+    // If the assistant FAB is hidden, take the bottom slot.
+    if (els.assistantFab && els.assistantFab.hidden) {
+      els.quickAddFab.classList.add("solo");
+    }
+  }
+  document.addEventListener("keydown", (e) => {
+    // Ignore when typing in an input/textarea/select or a modifier is held.
+    const tag = (e.target && e.target.tagName) || "";
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || e.target?.isContentEditable;
+    if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (els.appContent && els.appContent.hidden) return; // only when signed in
+    if (e.key === "n" || e.key === "N") {
+      e.preventDefault();
+      jumpToAddRecord();
+    } else if (e.key === "/") {
+      e.preventDefault();
+      switchView("records");
+      setTimeout(() => els.searchInput && els.searchInput.focus(), 120);
+    }
   });
 
   /* Activate the default view */
@@ -3828,6 +3939,37 @@ function wireEvents() {
     renderTransactionsTable();
   });
 
+  /* -- Advanced Record List filters -- */
+  function syncFiltersFromInputs() {
+    filters.dateFrom = els.filterDateFrom ? els.filterDateFrom.value : "";
+    filters.dateTo = els.filterDateTo ? els.filterDateTo.value : "";
+    filters.type = els.filterType ? els.filterType.value : "";
+    filters.category = els.filterCategory ? els.filterCategory.value : "";
+    filters.minAmount = els.filterMinAmount ? els.filterMinAmount.value : "";
+    filters.maxAmount = els.filterMaxAmount ? els.filterMaxAmount.value : "";
+    txPage = 1;
+    renderTransactionsTable();
+  }
+  [
+    els.filterDateFrom, els.filterDateTo, els.filterType,
+    els.filterCategory, els.filterMinAmount, els.filterMaxAmount,
+  ].forEach((el) => {
+    if (el) el.addEventListener("change", syncFiltersFromInputs);
+  });
+  if (els.clearFiltersBtn) {
+    els.clearFiltersBtn.addEventListener("click", () => {
+      if (els.filterDateFrom) els.filterDateFrom.value = "";
+      if (els.filterDateTo) els.filterDateTo.value = "";
+      if (els.filterType) els.filterType.value = "";
+      if (els.filterCategory) els.filterCategory.value = "";
+      if (els.filterMinAmount) els.filterMinAmount.value = "";
+      if (els.filterMaxAmount) els.filterMaxAmount.value = "";
+      filters = { dateFrom: "", dateTo: "", type: "", category: "", minAmount: "", maxAmount: "" };
+      txPage = 1;
+      renderTransactionsTable();
+    });
+  }
+
   if (els.cancelCategoryEdit) {
     els.cancelCategoryEdit.addEventListener("click", () => {
       cancelCategoryEdit();
@@ -3955,6 +4097,10 @@ function wireEvents() {
     syncBudgetRecordsModal();
   });
 
+  // Bank/TNG-style amount inputs
+  if (els.txAmount) initBankAmountInput(els.txAmount);
+  if (els.editTxAmount) initBankAmountInput(els.editTxAmount);
+
   // Duplicate detection on form input changes
   const dupFields = [els.txCategory, els.txType, els.txAmount, els.txDate];
   for (const field of dupFields) {
@@ -4043,6 +4189,7 @@ function wireEvents() {
       if (activeCategoryId) {
         data = data.filter((t) => t.categoryId === activeCategoryId);
       }
+      data = applyAdvancedFilters(data);
       if (data.length === 0) {
         setAppError("No records to export.");
         return;

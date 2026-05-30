@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Account Book</title>
     <link rel="manifest" href="./manifest.json" />
-    <meta name="theme-color" content="#7c5cfc" />
+    <meta name="theme-color" content="#03060f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=2" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css?v=7" />
   </head>
   <body>
     <header class="app-header">
@@ -153,7 +153,7 @@
               </label>
               <label class="field">
                 <span>Amount</span>
-                <input id="txAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+                <input id="txAmount" type="text" inputmode="numeric" placeholder="0.00" required autocomplete="off" />
               </label>
             </div>
 
@@ -199,6 +199,46 @@
             <input id="searchInput" class="search" type="search" placeholder="Search note text…" />
             <button id="clearSearchBtn" class="btn btn-secondary" type="button">Clear</button>
           </div>
+
+          <details id="advancedFilters" class="advanced-filters">
+            <summary>⚙️ Advanced filters</summary>
+            <div class="advanced-filters-grid">
+              <label class="field inline-sm">
+                <span>From date</span>
+                <input id="filterDateFrom" type="date" />
+              </label>
+              <label class="field inline-sm">
+                <span>To date</span>
+                <input id="filterDateTo" type="date" />
+              </label>
+              <label class="field inline-sm">
+                <span>Type</span>
+                <select id="filterType">
+                  <option value="">All</option>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </label>
+              <label class="field inline-sm">
+                <span>Category</span>
+                <select id="filterCategory">
+                  <option value="">All</option>
+                </select>
+              </label>
+              <label class="field inline-sm">
+                <span>Min amount</span>
+                <input id="filterMinAmount" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label class="field inline-sm">
+                <span>Max amount</span>
+                <input id="filterMaxAmount" type="number" min="0" step="0.01" placeholder="∞" />
+              </label>
+            </div>
+            <div class="row wrap" style="margin-top:8px">
+              <button id="clearFiltersBtn" class="btn btn-secondary btn-small" type="button">Reset filters</button>
+              <div id="filterSummary" class="muted small"></div>
+            </div>
+          </details>
 
           <div class="table-wrap">
             <table class="table" aria-label="Transactions table">
@@ -623,7 +663,7 @@
               </label>
               <label class="field">
                 <span>Amount</span>
-                <input id="editTxAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+                <input id="editTxAmount" type="text" inputmode="numeric" placeholder="0.00" required autocomplete="off" />
               </label>
             </div>
             <label class="field">
@@ -685,6 +725,11 @@
       <span class="fab-icon">🎙️</span>
     </button>
 
+    <!-- Quick Add (jump to Add Record from any view) -->
+    <button id="quickAddFab" class="quick-add-fab" type="button" title="Quick add record (N)" hidden aria-label="Quick add record">
+      <span class="fab-icon">＋</span>
+    </button>
+
     <div id="assistantPanel" class="assistant-panel" hidden>
       <div class="assistant-header">
         <div class="assistant-title">💬 Smart Assistant</div>
@@ -699,7 +744,7 @@
       </div>
     </div>
 
-    <script type="module" src="./app.js?v=2"></script>
+    <script type="module" src="./app.js?v=4"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

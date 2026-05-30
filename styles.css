@@ -1,87 +1,97 @@
 :root {
   color-scheme: light;
 
-  --bg: #f4f1fb;
-  --card: #ffffff;
-  --muted: rgba(80, 60, 120, 0.58);
-  --text: #2d2640;
-  --border: rgba(140, 120, 180, 0.18);
+  --bg: #eef0fb;
+  --card: rgba(255, 255, 255, 0.62);
+  --card-solid: #ffffff;
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-highlight: rgba(255, 255, 255, 0.85);
+  --muted: rgba(70, 52, 110, 0.62);
+  --text: #251f3a;
+  --border: rgba(140, 120, 180, 0.22);
 
   --primary: #7c5cfc;
+  --primary-strong: #5b3ce0;
   --primary-light: rgba(124, 92, 252, 0.12);
   --danger: #e54360;
   --warning: #e89420;
   --success: #22c55e;
 
-  --header-bg: rgba(244, 241, 251, 0.88);
-  --input-bg: rgba(124, 92, 252, 0.05);
-  --placeholder: rgba(80, 60, 120, 0.38);
-  --focus-border: rgba(124, 92, 252, 0.55);
-  --focus-ring: rgba(124, 92, 252, 0.18);
+  --header-bg: rgba(255, 255, 255, 0.45);
+  --input-bg: rgba(255, 255, 255, 0.5);
+  --placeholder: rgba(80, 60, 120, 0.42);
+  --focus-border: rgba(124, 92, 252, 0.6);
+  --focus-ring: rgba(124, 92, 252, 0.22);
   --selection-bg: rgba(124, 92, 252, 0.20);
 
   --btn-border: rgba(124, 92, 252, 0.25);
   --btn-bg: linear-gradient(135deg, #7c5cfc, #9b7dff);
   --btn-text: #ffffff;
-  --btn-secondary-bg: rgba(124, 92, 252, 0.08);
+  --btn-secondary-bg: rgba(255, 255, 255, 0.45);
   --danger-border: rgba(229, 67, 96, 0.30);
   --danger-bg: rgba(229, 67, 96, 0.08);
 
-  --row-hover: rgba(124, 92, 252, 0.05);
-  --stat-bg: rgba(124, 92, 252, 0.04);
+  --row-hover: rgba(124, 92, 252, 0.07);
+  --stat-bg: rgba(255, 255, 255, 0.4);
   --warning-border: rgba(232, 148, 32, 0.30);
-  --warning-bg: rgba(232, 148, 32, 0.08);
+  --warning-bg: rgba(232, 148, 32, 0.10);
   --warning-text: #5c3d00;
 
-  --shadow-sm: 0 2px 8px rgba(124, 92, 252, 0.08);
-  --shadow-md: 0 4px 20px rgba(124, 92, 252, 0.12);
-  --shadow-lg: 0 8px 32px rgba(124, 92, 252, 0.16);
-  --radius: 16px;
-  --radius-sm: 12px;
-  --radius-xs: 8px;
+  --shadow-sm: 0 2px 12px rgba(80, 60, 160, 0.10);
+  --shadow-md: 0 8px 30px rgba(80, 60, 160, 0.14);
+  --shadow-lg: 0 16px 48px rgba(80, 60, 160, 0.20);
+  --glow: 0 0 0 1px var(--glass-border), 0 8px 30px rgba(124, 92, 252, 0.18);
+  --radius: 20px;
+  --radius-sm: 14px;
+  --radius-xs: 10px;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #0e0b1e;
-  --card: #1a1432;
-  --muted: rgba(200, 185, 255, 0.60);
-  --text: #e8e2ff;
-  --border: rgba(200, 185, 255, 0.14);
+  --bg: #07050f;
+  --card: rgba(30, 24, 56, 0.55);
+  --card-solid: #1a1432;
+  --glass-border: rgba(180, 160, 255, 0.18);
+  --glass-highlight: rgba(200, 185, 255, 0.25);
+  --muted: rgba(200, 185, 255, 0.62);
+  --text: #ece7ff;
+  --border: rgba(200, 185, 255, 0.16);
 
   --primary: #a78bfa;
-  --primary-light: rgba(167, 139, 250, 0.15);
+  --primary-strong: #c4b5fd;
+  --primary-light: rgba(167, 139, 250, 0.18);
   --danger: #ff6b8a;
   --warning: #fbbf24;
   --success: #4ade80;
 
-  --header-bg: rgba(14, 11, 30, 0.80);
-  --input-bg: rgba(200, 185, 255, 0.07);
+  --header-bg: rgba(18, 14, 38, 0.45);
+  --input-bg: rgba(200, 185, 255, 0.06);
   --placeholder: rgba(200, 185, 255, 0.40);
-  --focus-border: rgba(167, 139, 250, 0.55);
-  --focus-ring: rgba(167, 139, 250, 0.20);
+  --focus-border: rgba(167, 139, 250, 0.6);
+  --focus-ring: rgba(167, 139, 250, 0.25);
   --selection-bg: rgba(167, 139, 250, 0.30);
 
   --btn-border: rgba(167, 139, 250, 0.30);
   --btn-bg: linear-gradient(135deg, #7c5cfc, #a78bfa);
   --btn-text: #ffffff;
-  --btn-secondary-bg: rgba(200, 185, 255, 0.08);
+  --btn-secondary-bg: rgba(200, 185, 255, 0.07);
   --danger-border: rgba(255, 107, 138, 0.30);
   --danger-bg: rgba(255, 107, 138, 0.12);
 
-  --row-hover: rgba(200, 185, 255, 0.06);
-  --stat-bg: rgba(200, 185, 255, 0.05);
+  --row-hover: rgba(200, 185, 255, 0.07);
+  --stat-bg: rgba(200, 185, 255, 0.04);
   --warning-border: rgba(251, 191, 36, 0.30);
   --warning-bg: rgba(251, 191, 36, 0.10);
   --warning-text: #fef3c7;
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.40);
-  --radius: 16px;
-  --radius-sm: 12px;
-  --radius-xs: 8px;
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --glow: 0 0 0 1px var(--glass-border), 0 8px 30px rgba(124, 92, 252, 0.30);
+  --radius: 20px;
+  --radius-sm: 14px;
+  --radius-xs: 10px;
 }
 
 * { box-sizing: border-box; overflow-anchor: none; }
@@ -108,6 +118,11 @@ body {
   color: var(--text);
   line-height: 1.6;
   letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  position: relative;
+  min-height: 100vh;
 }
 
 .container {
@@ -122,9 +137,9 @@ body {
   top: 0;
   z-index: 10;
   background: var(--header-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .app-header .container {
@@ -182,8 +197,10 @@ h1 { font-size: 20px; margin: 0; font-weight: 800; letter-spacing: -0.02em; }
   bottom: 0;
   z-index: 100;
   width: 260px;
-  background: var(--card);
-  border-right: 1px solid var(--border);
+  background: var(--header-bg);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-right: 1px solid var(--glass-border);
   box-shadow: var(--shadow-lg);
   transform: translateX(-100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -246,7 +263,7 @@ h1 { font-size: 20px; margin: 0; font-weight: 800; letter-spacing: -0.02em; }
   background: var(--btn-bg);
   color: var(--btn-text);
   font-weight: 700;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 6px 20px rgba(124, 92, 252, 0.45);
 }
 
 .sidebar-icon {
@@ -353,12 +370,34 @@ h1 { font-size: 20px; margin: 0; font-weight: 800; letter-spacing: -0.02em; }
 }
 
 .card {
+  position: relative;
   background: var(--card);
-  border: 1px solid var(--border);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   padding: 20px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease;
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, var(--glass-highlight), transparent 45%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
 }
 
 /* Compact layout for budget view */
@@ -404,13 +443,15 @@ h2 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: -0.02em; }
 input, select {
   width: 100%;
   background: var(--input-bg);
-  border: 1.5px solid var(--border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid var(--glass-border);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   color: var(--text);
   outline: none;
   font-size: 14px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 /* Windows native <select> dropdown uses light menu background; force readable option colors. */
@@ -647,7 +688,6 @@ input:focus, select:focus {
 }
 
 /* Budget warning badges */
-.budget-ok { }
 .budget-warn {
   background: rgba(255, 193, 7, 0.08);
 }
@@ -671,6 +711,10 @@ input:focus, select:focus {
 .budget-badge.over {
   background: rgba(220, 53, 69, 0.18);
   color: var(--danger);
+}
+.budget-badge.full {
+  background: var(--primary-light);
+  color: var(--primary);
 }
 .budget-badge.no-limit {
   background: var(--primary-light);
@@ -746,6 +790,10 @@ input:focus, select:focus {
 
 .budget-card-row.budget-over .budget-card-inner {
   border-left: 3px solid var(--danger);
+}
+
+.budget-card-row.budget-full .budget-card-inner {
+  border-left: 3px solid var(--primary);
 }
 
 .budget-card-top {
@@ -1309,6 +1357,39 @@ body {
   line-height: 1;
 }
 
+/* Quick Add floating button (sits above the assistant FAB) */
+.quick-add-fab {
+  position: fixed;
+  bottom: 92px;
+  right: 24px;
+  z-index: 50;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 6px 22px rgba(124, 92, 252, 0.45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.quick-add-fab:hover {
+  transform: scale(1.08) rotate(90deg);
+  box-shadow: 0 8px 30px rgba(124, 92, 252, 0.55);
+}
+.quick-add-fab .fab-icon {
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+}
+/* When the assistant FAB is hidden, drop Quick Add to the bottom slot */
+.quick-add-fab.solo {
+  bottom: 24px;
+}
+
 /* Panel */
 .assistant-panel {
   position: fixed;
@@ -1695,7 +1776,10 @@ body {
   animation: fadeIn 0.2s ease;
 }
 .edit-modal {
-  background: var(--card);
+  background: color-mix(in srgb, var(--card-solid) 82%, transparent);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   width: 90%;
@@ -1921,6 +2005,33 @@ body {
   border-radius: var(--radius-xs);
   font-size: 13px;
   color: var(--warning-text);
+}
+.dash-forecast-item {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+/* Advanced Record List filters */
+.advanced-filters {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  background: var(--stat-bg, var(--card));
+}
+.advanced-filters > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  list-style: none;
+  user-select: none;
+}
+.advanced-filters > summary::-webkit-details-marker { display: none; }
+.advanced-filters[open] > summary { margin-bottom: 10px; }
+.advanced-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
 }
 
 /* ─── Savings Goals ─── */
@@ -2252,6 +2363,633 @@ body {
   .dash-card-value {
     font-size: 14px;
   }
+}
+
+/* ======================================================================
+   ✦ DESIGN OVERHAUL v4 — "Aurora Glass Pro"
+   A bold, app-wide visual identity layer (loaded last so it wins).
+   ====================================================================== */
+
+:root {
+  --brand-gradient: linear-gradient(120deg, #7c5cfc 0%, #b06bff 38%, #19c5d6 100%);
+  --brand-gradient-soft: linear-gradient(120deg, #8b6bff, #6d5cff);
+  --sidebar-gradient: linear-gradient(185deg, #7b3ff2 0%, #5b21b6 52%, #2e1065 100%);
+}
+
+:root[data-theme="dark"] {
+  --sidebar-gradient: linear-gradient(185deg, #4c1d95 0%, #2e1065 55%, #140a2e 100%);
+}
+
+/* ---- Vibrant gradient sidebar (always-on color, white text) ---- */
+.sidebar {
+  background: var(--sidebar-gradient) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-right: none !important;
+  box-shadow: 12px 0 40px rgba(46, 16, 101, 0.35) !important;
+}
+
+.sidebar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.22), transparent 60%),
+    radial-gradient(120% 50% at 50% 110%, rgba(25, 197, 214, 0.25), transparent 60%);
+  mix-blend-mode: screen;
+}
+
+.sidebar-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16) !important;
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar-header h2 {
+  color: #fff;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-header #closeSidebar {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.sidebar-nav {
+  position: relative;
+  z-index: 1;
+  gap: 6px;
+  padding: 14px 12px;
+}
+
+.sidebar-item {
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 600;
+  border-radius: 14px;
+  padding: 13px 16px;
+  position: relative;
+}
+
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.sidebar-item.active {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: #4c1d95 !important;
+  font-weight: 800;
+  box-shadow: 0 10px 26px rgba(20, 10, 46, 0.35) !important;
+}
+
+:root[data-theme="dark"] .sidebar-item.active {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #3b0764 !important;
+}
+
+.sidebar-item.active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 60%;
+  border-radius: 0 6px 6px 0;
+  background: #fff;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.8);
+}
+
+.sidebar-icon {
+  font-size: 21px;
+}
+
+/* ---- Section headings get a gradient accent bar ---- */
+.card > .row > h2,
+.card > h2,
+.dash-section h3 {
+  position: relative;
+  padding-left: 14px;
+}
+
+.card > .row > h2::before,
+.card > h2::before,
+.dash-section h3::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 1.05em;
+  border-radius: 6px;
+  background: var(--brand-gradient);
+}
+
+/* ---- Pill buttons with glow ---- */
+.btn {
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.btn:not(.btn-secondary):not(.btn-danger) {
+  background: var(--brand-gradient-soft);
+  box-shadow: 0 8px 22px rgba(124, 92, 252, 0.35);
+}
+
+.btn:not(.btn-secondary):not(.btn-danger):hover {
+  box-shadow: 0 12px 30px rgba(124, 92, 252, 0.5);
+}
+
+.btn-secondary {
+  border-radius: 999px;
+}
+
+.btn-small {
+  border-radius: 999px;
+  padding: 8px 16px;
+}
+
+/* ---- Cards: stronger lift + brand top accent on hover ---- */
+.card {
+  border-radius: 22px;
+  padding: 24px;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+}
+
+/* ---- Bigger page rhythm ---- */
+.main.container,
+main.container {
+  padding-top: 22px;
+}
+
+.view-section.active,
+.stack { gap: 18px; }
+
+/* ---- Hero auth screen ---- */
+#authCard {
+  max-width: 460px;
+  margin: 6vh auto 0;
+  padding: 34px 30px;
+  border-radius: 26px;
+  box-shadow: var(--shadow-lg);
+}
+
+#authCard .row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+#authCard h2 {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  padding-left: 0;
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+#authCard h2::before { display: none; }
+
+#authCard .grid-2 { grid-template-columns: 1fr; }
+
+#authCard form .row.wrap {
+  flex-direction: column;
+  gap: 10px;
+}
+
+#authCard form .row.wrap .btn {
+  width: 100%;
+  text-align: center;
+  padding: 14px 22px;
+}
+
+/* ---- Quick-Add FAB: gradient + gentle pulse ---- */
+.quick-add-fab {
+  background: var(--brand-gradient-soft) !important;
+  box-shadow: 0 10px 30px rgba(124, 92, 252, 0.5);
+  animation: fabPulse 3.2s ease-in-out infinite;
+}
+
+@keyframes fabPulse {
+  0%, 100% { box-shadow: 0 10px 30px rgba(124, 92, 252, 0.45); }
+  50% { box-shadow: 0 10px 40px rgba(124, 92, 252, 0.75); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-add-fab { animation: none; }
+}
+
+/* ---- Inputs: rounder, brand focus glow ---- */
+input, select {
+  border-radius: 14px;
+}
+
+input:focus, select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--focus-ring), 0 4px 16px rgba(124, 92, 252, 0.18);
+}
+
+/* On desktop the sidebar text must stay light even though it's permanent */
+@media (min-width: 980px) {
+  .sidebar { box-shadow: 8px 0 36px rgba(46, 16, 101, 0.28) !important; }
+}
+
+/* ======================================================================
+   ☢ DESIGN OVERHAUL v6 — "CYBER HUD" (fintech x sci-fi console)
+   Last layer — wins the cascade. Forces a dark cockpit theme regardless
+   of light/dark toggle, with neon glow, monospace readouts & grid texture.
+   ====================================================================== */
+
+:root,
+:root[data-theme="dark"],
+:root[data-theme="light"] {
+  color-scheme: dark;
+
+  --hud-bg: #03060f;
+  --hud-bg2: #060b1c;
+  --hud-panel: rgba(10, 18, 38, 0.72);
+  --hud-panel-solid: #0a1226;
+  --hud-cyan: #2bf5ff;
+  --hud-magenta: #ff3df0;
+  --hud-lime: #8cff5a;
+  --hud-amber: #ffb648;
+  --hud-line: rgba(43, 245, 255, 0.22);
+  --hud-line-strong: rgba(43, 245, 255, 0.5);
+
+  --bg: var(--hud-bg);
+  --card: var(--hud-panel);
+  --card-solid: var(--hud-panel-solid);
+  --text: #d6f6ff;
+  --muted: rgba(140, 200, 230, 0.62);
+  --border: var(--hud-line);
+  --glass-border: var(--hud-line);
+  --glass-highlight: rgba(43, 245, 255, 0.18);
+  --primary: var(--hud-cyan);
+  --primary-strong: #7bfcff;
+  --primary-light: rgba(43, 245, 255, 0.10);
+  --danger: #ff4d6d;
+  --success: var(--hud-lime);
+  --warning: var(--hud-amber);
+  --input-bg: rgba(43, 245, 255, 0.05);
+  --placeholder: rgba(140, 200, 230, 0.4);
+  --focus-border: var(--hud-cyan);
+  --focus-ring: rgba(43, 245, 255, 0.22);
+  --row-hover: rgba(43, 245, 255, 0.07);
+  --stat-bg: rgba(43, 245, 255, 0.04);
+  --header-bg: rgba(3, 6, 15, 0.6);
+  --btn-secondary-bg: rgba(43, 245, 255, 0.06);
+  --selection-bg: rgba(43, 245, 255, 0.3);
+}
+
+/* ---- Cockpit background: deep space + neon grid + scanlines ---- */
+body {
+  background: var(--hud-bg);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(60vmax 60vmax at 12% 6%, rgba(43, 245, 255, 0.16), transparent 60%),
+    radial-gradient(55vmax 55vmax at 90% 12%, rgba(255, 61, 240, 0.14), transparent 60%),
+    radial-gradient(70vmax 70vmax at 70% 100%, rgba(43, 245, 255, 0.10), transparent 62%),
+    var(--hud-bg);
+  filter: none;
+  opacity: 1;
+  animation: none;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--hud-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hud-line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(120vmax 80vmax at 50% 0%, #000 30%, transparent 80%);
+  mask-image: radial-gradient(120vmax 80vmax at 50% 0%, #000 30%, transparent 80%);
+  opacity: 0.5;
+  animation: hudGridPan 30s linear infinite;
+}
+
+@keyframes hudGridPan {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 44px 44px, 44px 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; }
+}
+
+/* ---- Header: cockpit bar with scan glow ---- */
+.app-header {
+  background: linear-gradient(180deg, rgba(3, 6, 15, 0.9), rgba(3, 6, 15, 0.5)) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid var(--hud-line-strong) !important;
+  box-shadow: 0 0 28px rgba(43, 245, 255, 0.18);
+}
+
+.app-header h1 {
+  font-family: 'Orbitron', sans-serif !important;
+  font-size: 19px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--hud-cyan) !important;
+  text-shadow: 0 0 12px rgba(43, 245, 255, 0.7);
+}
+
+#authStatus { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+
+/* ---- Sidebar: HUD nav rail ---- */
+.sidebar {
+  background: linear-gradient(180deg, rgba(6, 11, 28, 0.96), rgba(3, 6, 15, 0.96)) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-right: 1px solid var(--hud-line-strong) !important;
+  box-shadow: 0 0 50px rgba(43, 245, 255, 0.12) inset, 14px 0 40px rgba(0, 0, 0, 0.6) !important;
+}
+
+.sidebar::after {
+  background:
+    linear-gradient(var(--hud-line) 1px, transparent 1px) 0 0 / 100% 40px,
+    radial-gradient(120% 50% at 50% -10%, rgba(43, 245, 255, 0.18), transparent 60%) !important;
+  mix-blend-mode: normal !important;
+  opacity: 0.5;
+}
+
+.sidebar-header { border-bottom: 1px solid var(--hud-line-strong) !important; }
+
+.sidebar-header h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+  text-shadow: 0 0 10px rgba(43, 245, 255, 0.6);
+}
+
+.sidebar-item {
+  color: rgba(190, 230, 245, 0.7) !important;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px !important;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  border-radius: 8px !important;
+  background: transparent !important;
+}
+
+.sidebar-item:hover {
+  color: var(--hud-cyan) !important;
+  background: rgba(43, 245, 255, 0.06) !important;
+  border-color: var(--hud-line);
+}
+
+.sidebar-item.active {
+  background: rgba(43, 245, 255, 0.12) !important;
+  color: var(--hud-cyan) !important;
+  border-color: var(--hud-line-strong) !important;
+  box-shadow: 0 0 22px rgba(43, 245, 255, 0.35), inset 0 0 14px rgba(43, 245, 255, 0.18) !important;
+  text-shadow: 0 0 8px rgba(43, 245, 255, 0.7);
+}
+
+.sidebar-item.active::before {
+  background: var(--hud-cyan) !important;
+  box-shadow: 0 0 14px var(--hud-cyan) !important;
+}
+
+/* Beat the v4 theme-scoped active rules (higher specificity) */
+:root[data-theme="dark"] .sidebar-item.active,
+:root[data-theme="light"] .sidebar-item.active,
+:root .sidebar-item.active {
+  background: rgba(43, 245, 255, 0.12) !important;
+  color: var(--hud-cyan) !important;
+  border: 1px solid var(--hud-line-strong) !important;
+  box-shadow: 0 0 22px rgba(43, 245, 255, 0.35), inset 0 0 14px rgba(43, 245, 255, 0.18) !important;
+  text-shadow: 0 0 8px rgba(43, 245, 255, 0.7);
+}
+
+/* ---- Cards: HUD panels with corner brackets + tracing top border ---- */
+.card {
+  background: var(--hud-panel) !important;
+  border: 1px solid var(--hud-line) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 1px rgba(43, 245, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.card::before {
+  inset: 0 !important;
+  padding: 0 !important;
+  border-radius: inherit !important;
+  background:
+    linear-gradient(90deg, transparent, var(--hud-cyan), transparent) top/200% 1px no-repeat !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  opacity: 0.9 !important;
+  animation: hudTrace 4s linear infinite;
+}
+
+@keyframes hudTrace {
+  0% { background-position: -100% 0; }
+  100% { background-position: 100% 0; }
+}
+
+/* Corner brackets via after */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left top / 14px 2px no-repeat,
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left top / 2px 14px no-repeat,
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right top / 14px 2px no-repeat,
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right top / 2px 14px no-repeat,
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left bottom / 14px 2px no-repeat,
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left bottom / 2px 14px no-repeat,
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right bottom / 14px 2px no-repeat,
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right bottom / 2px 14px no-repeat;
+  opacity: 0.35;
+}
+
+.card:hover { transform: none !important; box-shadow: 0 0 0 1px var(--hud-line-strong), 0 18px 44px rgba(0, 0, 0, 0.6), 0 0 30px rgba(43, 245, 255, 0.2) !important; }
+.card:hover::after { opacity: 0.7; }
+
+/* ---- Headings: Orbitron with accent ---- */
+.card > .row > h2,
+.card > h2,
+.dash-section h3 {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 14px;
+  color: #eafcff;
+}
+
+.card > .row > h2::before,
+.card > h2::before,
+.dash-section h3::before {
+  background: var(--hud-cyan) !important;
+  box-shadow: 0 0 12px var(--hud-cyan);
+}
+
+/* ---- Money / numbers / data: monospace glow ---- */
+.dash-card-value,
+.stat-value,
+.stat-card .stat-value,
+.budget-card-amount,
+.right,
+td.right,
+.amount,
+.money {
+  font-family: 'JetBrains Mono', monospace !important;
+  letter-spacing: 0.02em;
+}
+
+/* ---- Buttons: angular neon ---- */
+.btn {
+  border-radius: 6px !important;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.btn:not(.btn-secondary):not(.btn-danger) {
+  background: linear-gradient(135deg, rgba(43, 245, 255, 0.18), rgba(255, 61, 240, 0.16)) !important;
+  border: 1px solid var(--hud-line-strong) !important;
+  color: var(--hud-cyan) !important;
+  text-shadow: 0 0 8px rgba(43, 245, 255, 0.6);
+  box-shadow: 0 0 18px rgba(43, 245, 255, 0.25), inset 0 0 12px rgba(43, 245, 255, 0.1) !important;
+}
+
+.btn:not(.btn-secondary):not(.btn-danger):hover {
+  box-shadow: 0 0 28px rgba(43, 245, 255, 0.5), inset 0 0 16px rgba(43, 245, 255, 0.2) !important;
+  color: #eafcff !important;
+}
+
+.btn-secondary {
+  background: rgba(43, 245, 255, 0.05) !important;
+  border: 1px solid var(--hud-line) !important;
+  color: rgba(190, 230, 245, 0.85) !important;
+  border-radius: 6px !important;
+}
+
+.btn-secondary:hover {
+  border-color: var(--hud-line-strong) !important;
+  color: var(--hud-cyan) !important;
+  background: rgba(43, 245, 255, 0.1) !important;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, rgba(255, 77, 109, 0.25), rgba(255, 61, 240, 0.18)) !important;
+  border: 1px solid rgba(255, 77, 109, 0.5) !important;
+  color: #ff8aa0 !important;
+  text-shadow: 0 0 8px rgba(255, 77, 109, 0.5);
+}
+
+/* ---- Inputs: terminal fields ---- */
+input, select {
+  border-radius: 6px !important;
+  background: rgba(43, 245, 255, 0.04) !important;
+  border: 1px solid var(--hud-line) !important;
+  color: #eafcff !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+input:focus, select:focus {
+  border-color: var(--hud-cyan) !important;
+  box-shadow: 0 0 0 3px rgba(43, 245, 255, 0.18), 0 0 22px rgba(43, 245, 255, 0.3) !important;
+}
+
+.field span {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--hud-cyan);
+  opacity: 0.75;
+}
+
+/* ---- Tables ---- */
+.table-wrap, .chart-wrap {
+  border: 1px solid var(--hud-line) !important;
+  border-radius: 6px !important;
+  background: rgba(6, 11, 28, 0.5);
+}
+
+.table thead th {
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--hud-cyan);
+}
+
+/* ---- Hero auth: HUD login console ---- */
+#authCard {
+  border-radius: 8px !important;
+  border: 1px solid var(--hud-line-strong) !important;
+  box-shadow: 0 0 0 1px rgba(43, 245, 255, 0.1), 0 0 60px rgba(43, 245, 255, 0.18), 0 24px 60px rgba(0, 0, 0, 0.6) !important;
+}
+
+#authCard h2 {
+  font-family: 'Orbitron', sans-serif !important;
+  font-size: 24px !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--hud-cyan) !important;
+  text-shadow: 0 0 16px rgba(43, 245, 255, 0.6);
+}
+
+/* ---- Quick-Add FAB ---- */
+.quick-add-fab {
+  background: linear-gradient(135deg, rgba(43, 245, 255, 0.3), rgba(255, 61, 240, 0.25)) !important;
+  border: 1px solid var(--hud-line-strong) !important;
+  color: var(--hud-cyan) !important;
+  box-shadow: 0 0 30px rgba(43, 245, 255, 0.5) !important;
+  text-shadow: 0 0 10px rgba(43, 245, 255, 0.8);
+}
+
+/* ---- Menu button + toggles ---- */
+.menu-btn, #themeToggleBtn, #signOutBtn {
+  border-color: var(--hud-line) !important;
+}
+
+/* Scrollbar */
+* { scrollbar-color: var(--hud-line-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(43, 245, 255, 0.3); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(43, 245, 255, 0.5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .card::before { animation: none; }
 }
 
 /* -- Global touch optimization -- */
