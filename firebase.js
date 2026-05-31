@@ -138,6 +138,7 @@ export function userCollections(uid) {
     settings: collection(userDoc, "settings"),
     savingsGoals: collection(userDoc, "savingsGoals"),
     recurring: collection(userDoc, "recurring"),
+    templates: collection(userDoc, "templates"),
   };
 }
 

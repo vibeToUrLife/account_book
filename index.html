@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
   </head>
   <body>
     <header class="app-header">
@@ -137,6 +137,11 @@
             <div class="muted small">Choose category, expense/revenue, amount, and note.</div>
           </div>
 
+          <div id="templateChipsWrap" class="template-chips-wrap" hidden>
+            <div class="muted small">⚡ Quick templates:</div>
+            <div id="templateChips" class="template-chips"></div>
+          </div>
+
           <form id="txForm" class="stack" autocomplete="off">
             <label class="field">
               <span>Category</span>
@@ -164,6 +169,11 @@
               <div id="autoCategorySuggestion" class="auto-cat-hint small" hidden></div>
             </label>
 
+            <label class="field">
+              <span>Tags <span class="muted small">(comma-separated, optional)</span></span>
+              <input id="txTags" type="text" placeholder="e.g., work, urgent" maxlength="80" />
+            </label>
+
             <div id="duplicateWarning" class="callout callout-warning small" hidden role="alert">
               ⚠️ Similar record exists — same date, category & amount. Still add?
             </div>
@@ -179,6 +189,7 @@
             <div class="row wrap">
               <button id="txSubmitBtn" class="btn" type="submit">Record</button>
               <button id="cancelTxEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
+              <button id="saveTemplateBtn" class="btn btn-secondary" type="button" title="Save current form as a quick template">⭐ Save as Template</button>
               <button id="scanReceiptBtn" class="btn btn-secondary" type="button" title="Scan a receipt with camera">📷 Scan Receipt</button>
             </div>
           </form>
@@ -232,6 +243,10 @@
               <label class="field inline-sm">
                 <span>Max amount</span>
                 <input id="filterMaxAmount" type="number" min="0" step="0.01" placeholder="∞" />
+              </label>
+              <label class="field inline-sm">
+                <span>Tag</span>
+                <input id="filterTag" type="text" placeholder="e.g., work" maxlength="40" />
               </label>
             </div>
             <div class="row wrap" style="margin-top:8px">
@@ -463,7 +478,18 @@
             </div>
           </div>
           <div class="dash-section">
-            <h3>📈 Category Trends</h3>
+            <h3>� Cashflow (Income vs Expense)</h3>
+            <div class="muted small">Last 6 months income compared with expense.</div>
+            <canvas id="cashflowChart" height="200"></canvas>
+            <div id="cashflowChartMessage" class="muted small" hidden></div>
+          </div>
+          <div class="dash-section">
+            <h3>🗓️ Spending Heatmap</h3>
+            <div class="muted small">Daily expense this month — darker = more spent.</div>
+            <div id="heatmapCalendar" class="heatmap-calendar"></div>
+          </div>
+          <div class="dash-section">
+            <h3>�📈 Category Trends</h3>
             <div class="muted small">Monthly spending by category over time.</div>
             <canvas id="trendChart" height="200"></canvas>
             <div id="trendChartMessage" class="muted small" hidden></div>
@@ -563,6 +589,27 @@
               <input id="currencySymbolInput" type="text" placeholder="RM" maxlength="5" style="max-width:120px" />
             </label>
             <button id="saveCurrencyBtn" class="btn btn-secondary btn-small" type="button">Save Currency</button>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3>🔔 Budget Alerts</h3>
+            <div class="muted small">Get a browser notification when a category reaches 80% or exceeds its monthly budget.</div>
+            <div class="row wrap" style="gap:8px">
+              <button id="toggleBudgetAlertsBtn" class="btn btn-secondary btn-small" type="button">Enable Budget Alerts</button>
+              <span id="budgetAlertsStatus" class="muted small"></span>
+            </div>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3>⚡ Quick Templates</h3>
+            <div class="muted small">Saved templates appear as one-tap chips on the Add Record screen. Create them with "⭐ Save as Template" on that screen.</div>
+            <div id="templateManageList" class="template-manage-list">
+              <div class="muted small">No templates yet.</div>
+            </div>
           </div>
 
           <div class="divider-thin"></div>
@@ -671,6 +718,10 @@
               <input id="editTxNote" type="text" placeholder="e.g., eat" maxlength="80" />
             </label>
             <label class="field">
+              <span>Tags <span class="muted small">(comma-separated)</span></span>
+              <input id="editTxTags" type="text" placeholder="e.g., work, urgent" maxlength="80" />
+            </label>
+            <label class="field">
               <span>Date</span>
               <input id="editTxDate" type="date" required />
             </label>
@@ -744,7 +795,7 @@
       </div>
     </div>
 
-    <script type="module" src="./app.js?v=4"></script>
+    <script type="module" src="./app.js?v=5"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

@@ -89,3 +89,22 @@ export function escapeHtml(s) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+/**
+ * Parse a comma-separated tag string into a clean, de-duplicated array.
+ * Lowercases, trims, drops empties, caps at 8 tags of 20 chars each.
+ */
+export function parseTags(value) {
+  if (!value) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of String(value).split(",")) {
+    const t = raw.trim().toLowerCase().slice(0, 20);
+    if (t && !seen.has(t)) {
+      seen.add(t);
+      out.push(t);
+      if (out.length >= 8) break;
+    }
+  }
+  return out;
+}

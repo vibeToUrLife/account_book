@@ -3026,3 +3026,119 @@ input:focus, select:focus {
   }
 }
 
+/* ════════════════════════════════════════════════════════════
+   v8 — New feature UI: tags, templates, heatmap calendar
+   ════════════════════════════════════════════════════════════ */
+
+/* Tag chips in record list */
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.tag-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  color: var(--hud-cyan, #2bf5ff);
+  background: rgba(43, 245, 255, 0.1);
+  border: 1px solid var(--hud-line, rgba(43, 245, 255, 0.3));
+  letter-spacing: 0.02em;
+}
+
+/* Quick template chips on Add Record */
+.template-chips-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.template-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.template-chip {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--hud-cyan, #2bf5ff);
+  background: rgba(43, 245, 255, 0.08);
+  border: 1px solid var(--hud-line-strong, rgba(43, 245, 255, 0.5));
+  transition: background 0.15s, transform 0.1s;
+}
+.template-chip:hover {
+  background: rgba(43, 245, 255, 0.18);
+}
+.template-chip:active {
+  transform: scale(0.95);
+}
+
+/* Template management list in Settings */
+.template-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.template-manage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--hud-panel, rgba(10, 18, 38, 0.5));
+  border: 1px solid var(--hud-line, rgba(43, 245, 255, 0.2));
+}
+.template-manage-info {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Spending heatmap calendar */
+.heatmap-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-top: 10px;
+  max-width: 420px;
+}
+.heatmap-dayname {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted, #8aa);
+  padding-bottom: 2px;
+}
+.heatmap-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  background: rgba(43, 245, 255, 0.04);
+  border: 1px solid var(--hud-line, rgba(43, 245, 255, 0.12));
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+.heatmap-empty {
+  background: transparent;
+  border-color: transparent;
+}
+.heatmap-daynum {
+  font-size: 10px;
+  padding: 2px 4px;
+  color: var(--muted, #8aa);
+  opacity: 0.8;
+}
+.heatmap-l1 { background: rgba(43, 245, 255, 0.18); }
+.heatmap-l2 { background: rgba(43, 245, 255, 0.42); }
+.heatmap-l3 { background: rgba(255, 61, 240, 0.55); border-color: var(--hud-magenta, #ff3df0); }
+.heatmap-l2 .heatmap-daynum,
+.heatmap-l3 .heatmap-daynum { color: #fff; opacity: 1; }
+
