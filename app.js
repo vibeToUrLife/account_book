@@ -1328,6 +1328,18 @@ function setSignedOutUi() {
   if (els.assistantFab) els.assistantFab.hidden = true;
   if (els.assistantPanel) els.assistantPanel.hidden = true;
   if (els.quickAddFab) els.quickAddFab.hidden = true;
+  syncFabLayout();
+}
+
+/**
+ * Keep the two floating action buttons from overlapping. The Quick-Add FAB
+ * normally stacks above the assistant FAB; it only drops to the bottom slot
+ * (".solo") when the assistant FAB is actually hidden.
+ */
+function syncFabLayout() {
+  if (!els.quickAddFab) return;
+  const assistantVisible = !!(els.assistantFab && !els.assistantFab.hidden);
+  els.quickAddFab.classList.toggle("solo", !assistantVisible);
 }
 
 async function setSignedInUi(user) {
@@ -1337,6 +1349,7 @@ async function setSignedInUi(user) {
   els.signOutBtn.disabled = false;
   if (els.assistantFab) els.assistantFab.hidden = false;
   if (els.quickAddFab) els.quickAddFab.hidden = false;
+  syncFabLayout();
   setAuthError("");
   setAppError("");
   await startListenersForUser(uid);
@@ -3761,7 +3774,13 @@ function initBankAmountInput(el) {
     if (!raw) { cents = 0; el.value = ""; return; }
     cents = Math.min(Number(raw), 9_999_999);
     const formatted = fmt(cents);
-    if (el.value !== formatted) el.value = formatted;
+    if (el.value !== formatted) {
+      el.value = formatted;
+      // Keep the caret at the end so the next typed digit is always appended,
+      // not inserted mid-string (which would corrupt the value on some mobile
+      // keyboards).
+      try { el.setSelectionRange(formatted.length, formatted.length); } catch (_) {}
+    }
   });
 
   // Pre-fill from a stored float (e.g. 10.01 → shows "10.01")
@@ -3858,11 +3877,8 @@ function wireEvents() {
   }
   if (els.quickAddFab) {
     els.quickAddFab.addEventListener("click", jumpToAddRecord);
-    // If the assistant FAB is hidden, take the bottom slot.
-    if (els.assistantFab && els.assistantFab.hidden) {
-      els.quickAddFab.classList.add("solo");
-    }
   }
+  syncFabLayout();
   document.addEventListener("keydown", (e) => {
     // Ignore when typing in an input/textarea/select or a modifier is held.
     const tag = (e.target && e.target.tagName) || "";
