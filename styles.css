@@ -2153,6 +2153,7 @@ body {
 .debt-amount { font-variant-numeric: tabular-nums; }
 .debt-meta { color: var(--muted); font-size: 12px; margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; }
 .debt-due.overdue { color: var(--danger); font-weight: 600; }
+.debt-due.soon { color: var(--primary); font-weight: 600; }
 .debt-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 .debt-settled-tag { color: var(--success); font-size: 12px; font-weight: 600; }
 .debt-amount.revenue, .debt-summary-value.revenue { color: var(--success); }

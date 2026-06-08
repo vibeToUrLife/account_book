@@ -140,6 +140,7 @@ export function userCollections(uid) {
     recurring: collection(userDoc, "recurring"),
     templates: collection(userDoc, "templates"),
     debts: collection(userDoc, "debts"),
+    subscriptions: collection(userDoc, "subscriptions"),
   };
 }
 

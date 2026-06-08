@@ -72,6 +72,10 @@
           <span class="sidebar-icon">💳</span>
           <span>Debts</span>
         </button>
+        <button class="sidebar-item" data-view="subscriptions" type="button">
+          <span class="sidebar-icon">📺</span>
+          <span>Subscriptions</span>
+        </button>
         <button class="sidebar-item" data-view="settings" type="button">
           <span class="sidebar-icon">⚙️</span>
           <span>Settings</span>
@@ -653,6 +657,60 @@
           </div>
           <div id="debtsContainer" class="debts-list">
             <div class="muted small">No debts recorded yet.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Subscriptions -->
+        <section class="card stack view-section" data-view="subscriptions" aria-label="Subscriptions">
+          <div class="row">
+            <h2>📺 Subscriptions</h2>
+            <div class="muted small">Track recurring services and pay them on renewal.</div>
+          </div>
+          <form id="subForm" class="stack-compact" autocomplete="off">
+            <div class="grid-2">
+              <label class="field inline-sm">
+                <span>Name</span>
+                <input id="subName" type="text" placeholder="e.g., Netflix" required maxlength="40" />
+              </label>
+              <label class="field inline-sm">
+                <span>Category</span>
+                <select id="subCategory" required></select>
+              </label>
+            </div>
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Amount</span>
+                <input id="subAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Billing Cycle</span>
+                <select id="subCycle" required>
+                  <option value="month">Monthly</option>
+                  <option value="year">Yearly</option>
+                </select>
+              </label>
+              <label class="field inline-sm">
+                <span>Next Renewal</span>
+                <input id="subRenewal" type="date" required />
+              </label>
+            </div>
+            <div class="row">
+              <button id="subSubmitBtn" class="btn" type="submit">Add Subscription</button>
+            </div>
+          </form>
+
+          <div class="divider-thin"></div>
+
+          <div id="subSummary" class="debt-summary"></div>
+
+          <div class="row wrap" style="gap:8px">
+            <h3 style="margin:0">📋 Active</h3>
+            <label class="muted small" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input id="subShowCancelled" type="checkbox" /> Show cancelled
+            </label>
+          </div>
+          <div id="subsContainer" class="debts-list">
+            <div class="muted small">No subscriptions yet.</div>
           </div>
         </section>
 

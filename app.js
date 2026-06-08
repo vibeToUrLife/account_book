@@ -208,11 +208,13 @@ let savingsGoals = [];
 let recurringRules = [];
 let templates = [];
 let debts = [];
+let subscriptions = [];
 let unsubSettings = null;
 let unsubGoals = null;
 let unsubRecurring = null;
 let unsubTemplates = null;
 let unsubDebts = null;
+let unsubSubscriptions = null;
 
 // Budget notification tracking (avoid repeat alerts in one session)
 let budgetAlertsEnabled = localStorage.getItem("accountBook.budgetAlerts") === "on";
@@ -1222,7 +1224,7 @@ function renderAll() {
 }
 
 async function startListenersForUser(userId) {
-  const { categories: categoriesCol, transactions: txCol, settings: settingsCol, savingsGoals: goalsCol, recurring: recurringCol, debts: debtsCol } = userCollections(userId);
+  const { categories: categoriesCol, transactions: txCol, settings: settingsCol, savingsGoals: goalsCol, recurring: recurringCol, debts: debtsCol, subscriptions: subsCol } = userCollections(userId);
 
   if (unsubCategories) unsubCategories();
   if (unsubTransactions) unsubTransactions();
@@ -1230,6 +1232,7 @@ async function startListenersForUser(userId) {
   if (unsubGoals) unsubGoals();
   if (unsubRecurring) unsubRecurring();
   if (unsubDebts) unsubDebts();
+  if (unsubSubscriptions) unsubSubscriptions();
 
   // Listen to user settings (currency, etc.)
   unsubSettings = onSnapshot(doc(settingsCol, "preferences"), (snap) => {
@@ -1251,6 +1254,12 @@ async function startListenersForUser(userId) {
   unsubDebts = onSnapshot(query(debtsCol, orderBy("createdAt", "desc")), (snap) => {
     debts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderDebts();
+  });
+
+  // Listen to subscriptions
+  unsubSubscriptions = onSnapshot(query(subsCol, orderBy("createdAt", "desc")), (snap) => {
+    subscriptions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderSubscriptions();
   });
 
   // Listen to recurring rules
@@ -1305,6 +1314,7 @@ function stopListeners() {
   if (unsubRecurring) unsubRecurring();
   if (unsubTemplates) unsubTemplates();
   if (unsubDebts) unsubDebts();
+  if (unsubSubscriptions) unsubSubscriptions();
   unsubCategories = null;
   unsubTransactions = null;
   unsubSettings = null;
@@ -1312,6 +1322,7 @@ function stopListeners() {
   unsubRecurring = null;
   unsubTemplates = null;
   unsubDebts = null;
+  unsubSubscriptions = null;
 }
 
 function setSignedOutUi() {
@@ -1323,6 +1334,7 @@ function setSignedOutUi() {
   recurringRules = [];
   templates = [];
   debts = [];
+  subscriptions = [];
   currencySymbol = "";
   _recurringLoaded = false;
   _transactionsLoaded = false;
@@ -3591,6 +3603,164 @@ async function deleteDebt(debtId) {
   await deleteDoc(doc(debtsCol, debtId));
 }
 
+/* ─── Subscriptions ─── */
+function daysBetween(fromISO, toISO) {
+  const a = new Date(fromISO + "T00:00:00");
+  const b = new Date(toISO + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
+
+function advanceRenewal(dateISO, cycle) {
+  const d = new Date((dateISO || todayISO()) + "T00:00:00");
+  if (cycle === "year") d.setFullYear(d.getFullYear() + 1);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function renderSubscriptions() {
+  const container = document.getElementById("subsContainer");
+  const summary = document.getElementById("subSummary");
+  const catSel = document.getElementById("subCategory");
+  if (!container) return;
+
+  // Populate category select, preserving current selection
+  if (catSel) {
+    const prev = catSel.value;
+    catSel.innerHTML = "";
+    for (const c of categories) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name;
+      catSel.appendChild(opt);
+    }
+    if (prev && categories.some((c) => c.id === prev)) catSel.value = prev;
+  }
+
+  const showCancelled = !!document.getElementById("subShowCancelled")?.checked;
+  const active = subscriptions.filter((s) => s.status !== "cancelled");
+
+  const monthly = active.reduce((sum, s) => sum + (s.cycle === "year" ? (s.amount || 0) / 12 : (s.amount || 0)), 0);
+  const yearly = active.reduce((sum, s) => sum + (s.cycle === "year" ? (s.amount || 0) : (s.amount || 0) * 12), 0);
+  if (summary) {
+    summary.innerHTML = `
+      <div class="debt-summary-item"><span class="debt-summary-label">Per month</span><span class="debt-summary-value expense">${money(monthly)}</span></div>
+      <div class="debt-summary-item"><span class="debt-summary-label">Per year</span><span class="debt-summary-value expense">${money(yearly)}</span></div>
+      <div class="debt-summary-item"><span class="debt-summary-label">Active</span><span class="debt-summary-value">${active.length}</span></div>`;
+  }
+
+  const visible = showCancelled ? subscriptions : active;
+  if (visible.length === 0) {
+    container.innerHTML = '<div class="muted small">No subscriptions to show.</div>';
+    return;
+  }
+
+  const today = todayISO();
+  container.innerHTML = visible.map((s) => {
+    const cancelled = s.status === "cancelled";
+    const cycleLabel = s.cycle === "year" ? "Yearly" : "Monthly";
+
+    // Due state drives both the label and the Pay button
+    const days = s.nextRenewal ? daysBetween(today, s.nextRenewal) : 0;
+    const isOverdue = !!s.nextRenewal && days < 0;
+    const isDue = !s.nextRenewal || days <= 0; // payable today or past
+    let dueClass = "", dueText = "";
+    if (s.nextRenewal) {
+      if (days < 0) { dueClass = "overdue"; dueText = `Overdue · ${s.nextRenewal}`; }
+      else if (days === 0) { dueClass = "overdue"; dueText = "Renews today"; }
+      else if (days <= 3) { dueClass = "soon"; dueText = `Renews in ${days} day${days > 1 ? "s" : ""}`; }
+      else { dueText = `Renews ${s.nextRenewal}`; }
+    }
+    const cat = categories.find((c) => c.id === s.categoryId);
+    const catName = cat ? cat.name : (s.categoryName || "");
+
+    const payAttrs = isDue
+      ? `class="btn btn-small ${isOverdue ? "btn-danger" : ""}"`
+      : `class="btn btn-small" disabled title="Already paid — next renewal ${escapeHtml(s.nextRenewal || "")}"`;
+
+    return `<div class="debt-card ${cancelled ? "settled" : ""}">
+      <div class="debt-info">
+        <div class="debt-name">${escapeHtml(s.name || "?")} <span class="debt-amount expense">${money(s.amount || 0)}</span> <span class="debt-dir">/ ${cycleLabel}</span></div>
+        <div class="debt-meta">${escapeHtml(catName)} <span class="debt-due ${dueClass}">${escapeHtml(dueText)}</span></div>
+      </div>
+      <div class="debt-actions">
+        ${cancelled
+          ? `<span class="debt-settled-tag">Cancelled</span>`
+          : `<button ${payAttrs} type="button" data-action="pay-sub" data-id="${s.id}">Pay &amp; Record</button>
+             <button class="btn btn-secondary btn-small" type="button" data-action="cancel-sub" data-id="${s.id}">Cancel</button>`}
+        <button class="btn btn-danger btn-small" type="button" data-action="delete-sub" data-id="${s.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function addSubscription() {
+  const nameInput = document.getElementById("subName");
+  const catInput = document.getElementById("subCategory");
+  const amountInput = document.getElementById("subAmount");
+  const cycleInput = document.getElementById("subCycle");
+  const renewalInput = document.getElementById("subRenewal");
+  if (!nameInput || !amountInput) return;
+
+  const name = normalizeText(nameInput.value);
+  const categoryId = catInput ? catInput.value : "";
+  const amount = parsePositiveAmount(amountInput.value);
+  const cycle = cycleInput && cycleInput.value === "year" ? "year" : "month";
+  const nextRenewal = renewalInput ? renewalInput.value : "";
+
+  if (!name || amount == null || !categoryId || !nextRenewal) return;
+
+  const category = categories.find((c) => c.id === categoryId);
+  const categoryName = category ? category.name : "";
+
+  const { subscriptions: subsCol } = userCollections(uid);
+  await addDoc(subsCol, {
+    name, categoryId, categoryName, amount, cycle, nextRenewal,
+    status: "active", createdAt: serverTimestamp(),
+  });
+
+  nameInput.value = "";
+  amountInput.value = "";
+  if (renewalInput) renewalInput.value = "";
+  nameInput.focus();
+}
+
+async function paySubscription(subId) {
+  const sub = subscriptions.find((s) => s.id === subId);
+  if (!sub || !sub.categoryId || sub.status === "cancelled") return;
+  // Guard: only payable when due (renewal date is today or past)
+  if (sub.nextRenewal && daysBetween(todayISO(), sub.nextRenewal) > 0) return;
+
+  const category = categories.find((c) => c.id === sub.categoryId);
+  const categoryName = category ? category.name : (sub.categoryName || "(Unknown)");
+  const note = `${sub.name} subscription`;
+
+  const { transactions: txCol, subscriptions: subsCol } = userCollections(uid);
+  await addDoc(txCol, {
+    categoryId: sub.categoryId,
+    categoryName,
+    type: "expense",
+    amount: sub.amount || 0,
+    note,
+    noteLower: note.toLowerCase(),
+    tags: [],
+    dateISO: todayISO(),
+    createdAt: serverTimestamp(),
+  });
+
+  const nextRenewal = advanceRenewal(sub.nextRenewal, sub.cycle);
+  await setDoc(doc(subsCol, subId), { nextRenewal, lastPaidISO: todayISO() }, { merge: true });
+}
+
+async function cancelSubscription(subId) {
+  const { subscriptions: subsCol } = userCollections(uid);
+  await setDoc(doc(subsCol, subId), { status: "cancelled", cancelledAt: serverTimestamp() }, { merge: true });
+}
+
+async function deleteSubscription(subId) {
+  const { subscriptions: subsCol } = userCollections(uid);
+  await deleteDoc(doc(subsCol, subId));
+}
+
 /* ─── Recurring Transactions ─── */
 function renderRecurringRules() {
   const container = document.getElementById("recurringContainer");
@@ -3750,6 +3920,7 @@ function exportDataAsJson() {
     savingsGoals: savingsGoals.map((g) => ({ ...g })),
     recurringRules: recurringRules.map((r) => ({ ...r })),
     debts: debts.map((d) => ({ ...d })),
+    subscriptions: subscriptions.map((s) => ({ ...s })),
     settings: { currencySymbol },
   };
 
@@ -3778,7 +3949,7 @@ async function importDataFromJson(file) {
 
     if (statusEl) statusEl.textContent = "Importing…";
 
-    const { categories: catCol, transactions: txCol, savingsGoals: goalsCol, recurring: recCol, settings: settingsCol, debts: debtsCol } = userCollections(uid);
+    const { categories: catCol, transactions: txCol, savingsGoals: goalsCol, recurring: recCol, settings: settingsCol, debts: debtsCol, subscriptions: subsCol } = userCollections(uid);
 
     // Import categories
     let catCount = 0;
@@ -3840,12 +4011,28 @@ async function importDataFromJson(file) {
       }
     }
 
+    // Import subscriptions
+    let subCount = 0;
+    if (data.subscriptions) {
+      for (const s of data.subscriptions) {
+        if (!s.name || !s.amount) continue;
+        await addDoc(subsCol, {
+          name: s.name, categoryId: s.categoryId || "", categoryName: s.categoryName || "",
+          amount: s.amount, cycle: s.cycle === "year" ? "year" : "month",
+          nextRenewal: s.nextRenewal || todayISO(),
+          status: s.status === "cancelled" ? "cancelled" : "active",
+          createdAt: serverTimestamp(),
+        });
+        subCount++;
+      }
+    }
+
     // Import settings
     if (data.settings && data.settings.currencySymbol != null) {
       await setDoc(doc(settingsCol, "preferences"), { currencySymbol: data.settings.currencySymbol }, { merge: true });
     }
 
-    if (statusEl) statusEl.textContent = `✅ Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules, ${debtCount} debts.`;
+    if (statusEl) statusEl.textContent = `✅ Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules, ${debtCount} debts, ${subCount} subscriptions.`;
   } catch (err) {
     if (statusEl) statusEl.textContent = "❌ Import failed: " + (err.message || "Unknown error");
   }
@@ -4015,6 +4202,9 @@ function wireEvents() {
     }
     if (viewName === "debts") {
       renderDebts();
+    }
+    if (viewName === "subscriptions") {
+      renderSubscriptions();
     }
   }
 
@@ -4706,6 +4896,30 @@ function wireEvents() {
   const debtShowSettled = document.getElementById("debtShowSettled");
   if (debtShowSettled) {
     debtShowSettled.addEventListener("change", renderDebts);
+  }
+
+  // ── Subscriptions ──
+  const subForm = document.getElementById("subForm");
+  if (subForm) {
+    subForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      addSubscription();
+    });
+  }
+  const subsContainer = document.getElementById("subsContainer");
+  if (subsContainer) {
+    subsContainer.addEventListener("click", (e) => {
+      const payBtn = e.target.closest("[data-action='pay-sub']");
+      if (payBtn && payBtn.dataset.id) { paySubscription(payBtn.dataset.id); return; }
+      const cancelBtn = e.target.closest("[data-action='cancel-sub']");
+      if (cancelBtn && cancelBtn.dataset.id) { cancelSubscription(cancelBtn.dataset.id); return; }
+      const delBtn = e.target.closest("[data-action='delete-sub']");
+      if (delBtn && delBtn.dataset.id) deleteSubscription(delBtn.dataset.id);
+    });
+  }
+  const subShowCancelled = document.getElementById("subShowCancelled");
+  if (subShowCancelled) {
+    subShowCancelled.addEventListener("change", renderSubscriptions);
   }
 
   // ── Recurring Transactions ──
