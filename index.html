@@ -465,6 +465,28 @@
               <div id="dashCount" class="dash-card-value">0</div>
             </div>
           </div>
+          <div class="dash-section alloc-section">
+            <h3>💰 Salary Allocation</h3>
+            <div class="muted small">This month's income minus your monthly category budgets.</div>
+            <div class="alloc-rows">
+              <div class="alloc-row">
+                <span class="alloc-label">Income (this month)</span>
+                <span id="allocIncome" class="alloc-value">0.00</span>
+              </div>
+              <div class="alloc-row">
+                <span class="alloc-label">− Budgeted (monthly)</span>
+                <span id="allocBudgeted" class="alloc-value">0.00</span>
+              </div>
+              <div class="alloc-row alloc-row-total">
+                <span class="alloc-label">= Remaining / Unallocated</span>
+                <span id="allocRemaining" class="alloc-value">0.00</span>
+              </div>
+            </div>
+            <div class="alloc-bar-wrap">
+              <div id="allocBar" class="alloc-bar"></div>
+            </div>
+            <div id="allocNote" class="muted small"></div>
+          </div>
           <div class="dash-section">
             <h3>📋 Recent Transactions</h3>
             <div id="dashRecentTx" class="dash-recent-list">

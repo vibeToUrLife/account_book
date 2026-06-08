@@ -3021,6 +3021,42 @@ function renderDashboard() {
   }
   if (dashCount) dashCount.textContent = String(transactions.length);
 
+  // Salary allocation: this month's income − monthly category budgets
+  const budgetedMonthly = categories.reduce(
+    (sum, c) => (c.budget > 0 && (c.budgetPeriod || "month") === "month" ? sum + c.budget : sum),
+    0
+  );
+  const remaining = revenue - budgetedMonthly;
+  const allocIncome = document.getElementById("allocIncome");
+  const allocBudgeted = document.getElementById("allocBudgeted");
+  const allocRemaining = document.getElementById("allocRemaining");
+  const allocBar = document.getElementById("allocBar");
+  const allocNote = document.getElementById("allocNote");
+
+  if (allocIncome) allocIncome.textContent = money(revenue);
+  if (allocBudgeted) allocBudgeted.textContent = money(budgetedMonthly);
+  if (allocRemaining) {
+    allocRemaining.textContent = money(remaining);
+    allocRemaining.style.color = remaining >= 0 ? "var(--success)" : "var(--danger)";
+  }
+  if (allocBar) {
+    const pct = revenue > 0
+      ? Math.min((budgetedMonthly / revenue) * 100, 100)
+      : (budgetedMonthly > 0 ? 100 : 0);
+    allocBar.style.width = pct + "%";
+    allocBar.classList.toggle("over", remaining < 0);
+  }
+  if (allocNote) {
+    if (revenue <= 0) {
+      allocNote.textContent = "No income recorded this month yet.";
+    } else if (remaining < 0) {
+      allocNote.textContent = `Over-allocated by ${money(-remaining)} — your monthly budgets exceed this month's income.`;
+    } else {
+      const pctBudgeted = Math.round((budgetedMonthly / revenue) * 100);
+      allocNote.textContent = `${pctBudgeted}% of income budgeted — ${money(remaining)} still unallocated.`;
+    }
+  }
+
   // Recent transactions (last 5)
   const dashRecent = document.getElementById("dashRecentTx");
   if (dashRecent) {
