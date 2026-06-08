@@ -25,6 +25,13 @@ import {
   parseTags,
 } from "./utils.js?v=5";
 
+import { createDebts } from "./js/features/debts.js";
+import { createSubscriptions } from "./js/features/subscriptions.js";
+import { createGoals } from "./js/features/goals.js";
+import { createTemplates } from "./js/features/templates.js";
+import { createReceipts } from "./js/features/receipts.js";
+import { createRecurring } from "./js/features/recurring.js";
+
 const {
   collection,
   addDoc,
@@ -211,8 +218,6 @@ let recurringRules = [];
 let templates = [];
 let debts = [];
 let subscriptions = [];
-let pendingReceipts = [];   // dataURLs queued on the Add Record form
-let receiptViewerTxId = null;
 let unsubSettings = null;
 let unsubGoals = null;
 let unsubRecurring = null;
@@ -223,11 +228,6 @@ let unsubSubscriptions = null;
 // Budget notification tracking (avoid repeat alerts in one session)
 let budgetAlertsEnabled = localStorage.getItem("accountBook.budgetAlerts") === "on";
 const _notifiedBudgets = new Set();
-
-// Auto-run recurring tracking
-let _recurringLoaded = false;
-let _transactionsLoaded = false;
-let _hasAutoRunRecurring = false;
 
 async function ensureChartJs() {
   if (ChartJs) return ChartJs;
@@ -686,6 +686,44 @@ let transactions = [];
 
 let searchTerm = "";
 let activeCategoryId = "";
+
+// ─── Shared context for extracted feature modules ───────────────────────────
+// Live getters expose the core's current state without copying; helpers + a
+// firestore bag are passed by reference. Modules read ctx.* and write through
+// Firestore — the core's onSnapshot listeners refresh state and re-render.
+const ctx = {
+  get transactions() { return transactions; },
+  get categories() { return categories; },
+  get debts() { return debts; },
+  get subscriptions() { return subscriptions; },
+  get savingsGoals() { return savingsGoals; },
+  get recurringRules() { return recurringRules; },
+  get templates() { return templates; },
+  get uid() { return uid; },
+  get currencySymbol() { return currencySymbol; },
+  els,
+  money,
+  escapeHtml,
+  todayISO,
+  normalizeText,
+  parsePositiveAmount,
+  clamp,
+  setAppError,
+  showUndoToast,
+  userCollections,
+  firestore: { collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, onSnapshot, orderBy, query, serverTimestamp },
+  get refresh() { return renderAll; },
+};
+
+// Feature modules (extracted from this file incrementally)
+const { renderDebts, addDebt, settleDebt, deleteDebt } = createDebts(ctx);
+const { renderSubscriptions, addSubscription, paySubscription, cancelSubscription, deleteSubscription } = createSubscriptions(ctx);
+const { renderSavingsGoals, addSavingsGoal, deleteSavingsGoal } = createGoals(ctx);
+const { renderTemplates, saveCurrentAsTemplate, applyTemplate, deleteTemplate } = createTemplates(ctx);
+const receipts = createReceipts(ctx);
+const { queuePendingReceipts, removePendingAt, openReceiptViewer, closeReceiptViewer, addReceiptsFromViewer, deleteReceiptFromViewer, openLightbox, closeLightbox } = receipts;
+const recurring = createRecurring(ctx);
+const { renderRecurringRules, addRecurringRule, deleteRecurringRule, runDueRecurring } = recurring;
 
 // Advanced Record List filters
 let filters = {
@@ -1294,9 +1332,9 @@ async function startListenersForUser(userId) {
   // Listen to recurring rules
   unsubRecurring = onSnapshot(query(recurringCol, orderBy("createdAt", "asc")), (snap) => {
     recurringRules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    _recurringLoaded = true;
+    recurring.markRecurringLoaded();
     renderRecurringRules();
-    autoRunDueRecurring();
+    recurring.autoRun();
   });
 
   // Listen to quick templates
@@ -1330,8 +1368,8 @@ async function startListenersForUser(userId) {
     ensureStatsYearOptions();
     renderBudgetScopeLabel();
     renderAll();
-    _transactionsLoaded = true;
-    autoRunDueRecurring();
+    recurring.markTransactionsLoaded();
+    recurring.autoRun();
   });
 }
 
@@ -1365,9 +1403,7 @@ function setSignedOutUi() {
   debts = [];
   subscriptions = [];
   currencySymbol = "";
-  _recurringLoaded = false;
-  _transactionsLoaded = false;
-  _hasAutoRunRecurring = false;
+  recurring.reset();
   activeCategoryId = "";
   txPage = 1;
   setAppError("");
@@ -1535,7 +1571,7 @@ async function addTransaction() {
 
   const { transactions: txCol } = userCollections(uid);
 
-  const queued = pendingReceipts.slice();
+  const queuedCount = receipts.pendingCount();
   const ref = await addDoc(txCol, {
     categoryId,
     categoryName,
@@ -1545,14 +1581,11 @@ async function addTransaction() {
     noteLower: note.toLowerCase(),
     tags,
     dateISO,
-    receiptCount: queued.length,
+    receiptCount: queuedCount,
     createdAt: serverTimestamp(),
   });
 
-  if (queued.length) {
-    await saveReceiptsForTx(ref.id, queued);
-  }
-  clearPendingReceipts();
+  await receipts.flushPendingTo(ref.id);
 
   lastUsedCategoryId = categoryId;
   if (els.txAmount._bankPrefill) els.txAmount._bankPrefill(0);
@@ -1833,8 +1866,7 @@ async function deleteTransactionById(txId) {
   const { transactions: txCol } = userCollections(uid);
   // Remove attached receipt photos first (subcollections aren't auto-deleted).
   try {
-    const snap = await getDocs(receiptsCol(txId));
-    for (const d of snap.docs) await deleteDoc(d.ref);
+    await receipts.deleteAllForTx(txId);
   } catch { /* ignore */ }
   await deleteDoc(doc(txCol, txId));
 }
@@ -3377,78 +3409,7 @@ async function renderTrendChart() {
 }
 
 /* ─── Quick Templates ─── */
-function renderTemplates() {
-  // Chips on the Add Record screen
-  if (els.templateChips && els.templateChipsWrap) {
-    if (!templates.length) {
-      els.templateChips.innerHTML = "";
-      els.templateChipsWrap.hidden = true;
-    } else {
-      els.templateChipsWrap.hidden = false;
-      els.templateChips.innerHTML = templates.map((t) =>
-        `<button type="button" class="template-chip" data-action="apply-template" data-id="${t.id}">${escapeHtml(t.label || t.note || t.categoryName || "Template")}</button>`
-      ).join("");
-    }
-  }
-
-  // Management list in Settings
-  if (els.templateManageList) {
-    if (!templates.length) {
-      els.templateManageList.innerHTML = '<div class="muted small">No templates yet.</div>';
-    } else {
-      els.templateManageList.innerHTML = templates.map((t) => {
-        const typeLabel = t.type === "revenue" ? "Revenue" : "Expense";
-        const amt = t.amount ? money(t.amount) : "";
-        return `<div class="template-manage-item">
-          <span class="template-manage-info">${escapeHtml(t.label || t.note || "Template")} — ${escapeHtml(t.categoryName || "(no category)")} · ${typeLabel}${amt ? " · " + amt : ""}</span>
-          <button type="button" class="btn btn-danger btn-small" data-action="delete-template" data-id="${t.id}">Delete</button>
-        </div>`;
-      }).join("");
-    }
-  }
-}
-
-async function saveCurrentAsTemplate() {
-  const categoryId = els.txCategory.value;
-  const type = els.txType.value;
-  const amount = parsePositiveAmount(els.txAmount.value);
-  const note = normalizeText(els.txNote.value);
-  const category = categories.find((c) => c.id === categoryId);
-  if (!categoryId) {
-    setAppError("Pick a category before saving a template.");
-    return;
-  }
-  const label = (note || category?.name || "Template").slice(0, 40);
-  const { templates: templatesCol } = userCollections(uid);
-  await addDoc(templatesCol, {
-    label,
-    categoryId,
-    categoryName: category ? category.name : "(Unknown)",
-    type: type === "revenue" ? "revenue" : "expense",
-    amount: amount || 0,
-    note,
-    createdAt: serverTimestamp(),
-  });
-}
-
-function applyTemplate(id) {
-  const t = templates.find((x) => x.id === id);
-  if (!t) return;
-  if (t.categoryId && categories.some((c) => c.id === t.categoryId)) {
-    els.txCategory.value = t.categoryId;
-  }
-  els.txType.value = t.type === "revenue" ? "revenue" : "expense";
-  if (els.txAmount._bankPrefill) els.txAmount._bankPrefill(t.amount || 0);
-  else els.txAmount.value = t.amount ? String(t.amount) : "";
-  els.txNote.value = t.note || "";
-  if (!els.txDate.value) els.txDate.value = todayISO();
-  els.txAmount.focus();
-}
-
-async function deleteTemplate(id) {
-  const { templates: templatesCol } = userCollections(uid);
-  await deleteDoc(doc(templatesCol, id));
-}
+/* ─── Quick Templates → extracted to js/features/templates.js (createTemplates) ─── */
 
 /* ─── Cashflow Chart (income vs expense, last 6 months) ─── */
 async function renderCashflowChart() {
@@ -3630,611 +3591,15 @@ function updateBudgetAlertsUi() {
 }
 
 /* ─── Savings Goals ─── */
-function renderSavingsGoals() {
-  const container = document.getElementById("goalsContainer");
-  if (!container) return;
+/* ─── Savings Goals → extracted to js/features/goals.js (createGoals) ─── */
 
-  if (savingsGoals.length === 0) {
-    container.innerHTML = '<div class="muted small">No savings goals yet. Add one above!</div>';
-    return;
-  }
+/* ─── Debts / Lending → extracted to js/features/debts.js (createDebts) ─── */
 
-  // Calculate total saved = revenue - expense across all time
-  const totalRevenue = transactions.filter((t) => t.type === "revenue").reduce((s, t) => s + t.amount, 0);
-  const totalExpense = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-  const totalSaved = Math.max(0, totalRevenue - totalExpense);
+/* ─── Subscriptions → extracted to js/features/subscriptions.js (createSubscriptions) ─── */
 
-  container.innerHTML = savingsGoals.map((g) => {
-    const target = g.target || 0;
-    const saved = Math.min(totalSaved, target);
-    const pct = target > 0 ? Math.min(100, (saved / target) * 100) : 0;
-    const isDone = pct >= 100;
-    const deadline = g.deadline ? `Due: ${g.deadline}` : "No deadline";
+/* ─── Receipt Photos → extracted to js/features/receipts.js (createReceipts) ─── */
 
-    return `<div class="goal-card">
-      <div class="goal-card-header">
-        <h4>🎯 ${escapeHtml(g.name || "Untitled")}</h4>
-        <span class="goal-deadline">${deadline}</span>
-      </div>
-      <div class="goal-progress-bar">
-        <div class="goal-progress-fill ${isDone ? 'done' : ''}" style="width:${pct}%"></div>
-      </div>
-      <div class="goal-stats">
-        <span>${money(saved)} / ${money(target)}</span>
-        <span class="goal-pct">${pct.toFixed(1)}%</span>
-      </div>
-      <div class="goal-actions">
-        <button class="btn btn-danger btn-small" type="button" data-action="delete-goal" data-id="${g.id}">Delete</button>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-async function addSavingsGoal() {
-  const nameInput = document.getElementById("goalName");
-  const targetInput = document.getElementById("goalTarget");
-  const deadlineInput = document.getElementById("goalDeadline");
-  if (!nameInput || !targetInput) return;
-
-  const name = normalizeText(nameInput.value);
-  const target = parsePositiveAmount(targetInput.value);
-  const deadline = deadlineInput ? deadlineInput.value : "";
-
-  if (!name || target == null) return;
-
-  const { savingsGoals: goalsCol } = userCollections(uid);
-  await addDoc(goalsCol, { name, target, deadline, createdAt: serverTimestamp() });
-
-  nameInput.value = "";
-  targetInput.value = "";
-  if (deadlineInput) deadlineInput.value = "";
-}
-
-async function deleteSavingsGoal(goalId) {
-  const { savingsGoals: goalsCol } = userCollections(uid);
-  await deleteDoc(doc(goalsCol, goalId));
-}
-
-/* ─── Debts / Lending ─── */
-function renderDebts() {
-  const container = document.getElementById("debtsContainer");
-  const summary = document.getElementById("debtSummary");
-  if (!container) return;
-
-  const showSettled = !!document.getElementById("debtShowSettled")?.checked;
-
-  // Summary (outstanding only)
-  const outstanding = debts.filter((d) => d.status !== "settled");
-  const owedToMe = outstanding.filter((d) => d.direction === "owed_to_me").reduce((s, d) => s + (d.amount || 0), 0);
-  const iOwe = outstanding.filter((d) => d.direction === "i_owe").reduce((s, d) => s + (d.amount || 0), 0);
-  const net = owedToMe - iOwe;
-  if (summary) {
-    const netCls = net >= 0 ? "revenue" : "expense";
-    summary.innerHTML = `
-      <div class="debt-summary-item"><span class="debt-summary-label">Owed to me</span><span class="debt-summary-value revenue">${money(owedToMe)}</span></div>
-      <div class="debt-summary-item"><span class="debt-summary-label">I owe</span><span class="debt-summary-value expense">${money(iOwe)}</span></div>
-      <div class="debt-summary-item"><span class="debt-summary-label">Net</span><span class="debt-summary-value ${netCls}">${money(net)}</span></div>`;
-  }
-
-  const visible = showSettled ? debts : outstanding;
-  if (visible.length === 0) {
-    container.innerHTML = '<div class="muted small">No debts to show.</div>';
-    return;
-  }
-
-  const today = todayISO();
-  container.innerHTML = visible.map((d) => {
-    const settled = d.status === "settled";
-    const isOwedToMe = d.direction === "owed_to_me";
-    const dirLabel = isOwedToMe ? "owes me" : "I owe";
-    const amtCls = isOwedToMe ? "revenue" : "expense";
-    const overdue = !settled && d.dueDate && d.dueDate < today;
-    const due = d.dueDate
-      ? `<span class="debt-due ${overdue ? "overdue" : ""}">Due ${escapeHtml(d.dueDate)}${overdue ? " · overdue" : ""}</span>`
-      : "";
-    const note = d.note ? `<span class="debt-note">${escapeHtml(d.note)}</span>` : "";
-    return `<div class="debt-card ${settled ? "settled" : ""}">
-      <div class="debt-info">
-        <div class="debt-name">${escapeHtml(d.person || "?")} <span class="debt-dir">${dirLabel}</span> <span class="debt-amount ${amtCls}">${money(d.amount || 0)}</span></div>
-        <div class="debt-meta">${escapeHtml(d.dateISO || "")} ${due} ${note}</div>
-      </div>
-      <div class="debt-actions">
-        ${settled
-          ? `<span class="debt-settled-tag">✅ Settled</span>`
-          : `<button class="btn btn-secondary btn-small" type="button" data-action="settle-debt" data-id="${d.id}">Mark paid</button>`}
-        <button class="btn btn-danger btn-small" type="button" data-action="delete-debt" data-id="${d.id}">Delete</button>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-async function addDebt() {
-  const personInput = document.getElementById("debtPerson");
-  const directionInput = document.getElementById("debtDirection");
-  const amountInput = document.getElementById("debtAmount");
-  const noteInput = document.getElementById("debtNote");
-  const dueInput = document.getElementById("debtDueDate");
-  if (!personInput || !amountInput) return;
-
-  const person = normalizeText(personInput.value);
-  const direction = directionInput && directionInput.value === "i_owe" ? "i_owe" : "owed_to_me";
-  const amount = parsePositiveAmount(amountInput.value);
-  const note = noteInput ? normalizeText(noteInput.value) : "";
-  const dueDate = dueInput ? dueInput.value : "";
-
-  if (!person || amount == null) return;
-
-  const { debts: debtsCol } = userCollections(uid);
-  await addDoc(debtsCol, {
-    person,
-    direction,
-    amount,
-    note,
-    dateISO: todayISO(),
-    dueDate,
-    status: "outstanding",
-    createdAt: serverTimestamp(),
-  });
-
-  personInput.value = "";
-  amountInput.value = "";
-  if (noteInput) noteInput.value = "";
-  if (dueInput) dueInput.value = "";
-  personInput.focus();
-}
-
-async function settleDebt(debtId) {
-  const { debts: debtsCol } = userCollections(uid);
-  await setDoc(doc(debtsCol, debtId), { status: "settled", settledAt: serverTimestamp() }, { merge: true });
-}
-
-async function deleteDebt(debtId) {
-  const { debts: debtsCol } = userCollections(uid);
-  await deleteDoc(doc(debtsCol, debtId));
-}
-
-/* ─── Subscriptions ─── */
-function daysBetween(fromISO, toISO) {
-  const a = new Date(fromISO + "T00:00:00");
-  const b = new Date(toISO + "T00:00:00");
-  return Math.round((b - a) / 86400000);
-}
-
-function advanceRenewal(dateISO, cycle) {
-  const d = new Date((dateISO || todayISO()) + "T00:00:00");
-  if (cycle === "year") d.setFullYear(d.getFullYear() + 1);
-  else d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function renderSubscriptions() {
-  const container = document.getElementById("subsContainer");
-  const summary = document.getElementById("subSummary");
-  const catSel = document.getElementById("subCategory");
-  if (!container) return;
-
-  // Populate category select, preserving current selection
-  if (catSel) {
-    const prev = catSel.value;
-    catSel.innerHTML = "";
-    for (const c of categories) {
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = c.name;
-      catSel.appendChild(opt);
-    }
-    if (prev && categories.some((c) => c.id === prev)) catSel.value = prev;
-  }
-
-  const showCancelled = !!document.getElementById("subShowCancelled")?.checked;
-  const active = subscriptions.filter((s) => s.status !== "cancelled");
-
-  const monthly = active.reduce((sum, s) => sum + (s.cycle === "year" ? (s.amount || 0) / 12 : (s.amount || 0)), 0);
-  const yearly = active.reduce((sum, s) => sum + (s.cycle === "year" ? (s.amount || 0) : (s.amount || 0) * 12), 0);
-  if (summary) {
-    summary.innerHTML = `
-      <div class="debt-summary-item"><span class="debt-summary-label">Per month</span><span class="debt-summary-value expense">${money(monthly)}</span></div>
-      <div class="debt-summary-item"><span class="debt-summary-label">Per year</span><span class="debt-summary-value expense">${money(yearly)}</span></div>
-      <div class="debt-summary-item"><span class="debt-summary-label">Active</span><span class="debt-summary-value">${active.length}</span></div>`;
-  }
-
-  const visible = showCancelled ? subscriptions : active;
-  if (visible.length === 0) {
-    container.innerHTML = '<div class="muted small">No subscriptions to show.</div>';
-    return;
-  }
-
-  const today = todayISO();
-  container.innerHTML = visible.map((s) => {
-    const cancelled = s.status === "cancelled";
-    const cycleLabel = s.cycle === "year" ? "Yearly" : "Monthly";
-
-    // Due state drives both the label and the Pay button
-    const days = s.nextRenewal ? daysBetween(today, s.nextRenewal) : 0;
-    const isOverdue = !!s.nextRenewal && days < 0;
-    const isDue = !s.nextRenewal || days <= 0; // payable today or past
-    let dueClass = "", dueText = "";
-    if (s.nextRenewal) {
-      if (days < 0) { dueClass = "overdue"; dueText = `Overdue · ${s.nextRenewal}`; }
-      else if (days === 0) { dueClass = "overdue"; dueText = "Renews today"; }
-      else if (days <= 3) { dueClass = "soon"; dueText = `Renews in ${days} day${days > 1 ? "s" : ""}`; }
-      else { dueText = `Renews ${s.nextRenewal}`; }
-    }
-    const cat = categories.find((c) => c.id === s.categoryId);
-    const catName = cat ? cat.name : (s.categoryName || "");
-
-    const payAttrs = isDue
-      ? `class="btn btn-small ${isOverdue ? "btn-danger" : ""}"`
-      : `class="btn btn-small" disabled title="Already paid — next renewal ${escapeHtml(s.nextRenewal || "")}"`;
-
-    return `<div class="debt-card ${cancelled ? "settled" : ""}">
-      <div class="debt-info">
-        <div class="debt-name">${escapeHtml(s.name || "?")} <span class="debt-amount expense">${money(s.amount || 0)}</span> <span class="debt-dir">/ ${cycleLabel}</span></div>
-        <div class="debt-meta">${escapeHtml(catName)} <span class="debt-due ${dueClass}">${escapeHtml(dueText)}</span></div>
-      </div>
-      <div class="debt-actions">
-        ${cancelled
-          ? `<span class="debt-settled-tag">Cancelled</span>`
-          : `<button ${payAttrs} type="button" data-action="pay-sub" data-id="${s.id}">Pay &amp; Record</button>
-             <button class="btn btn-secondary btn-small" type="button" data-action="cancel-sub" data-id="${s.id}">Cancel</button>`}
-        <button class="btn btn-danger btn-small" type="button" data-action="delete-sub" data-id="${s.id}">Delete</button>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-async function addSubscription() {
-  const nameInput = document.getElementById("subName");
-  const catInput = document.getElementById("subCategory");
-  const amountInput = document.getElementById("subAmount");
-  const cycleInput = document.getElementById("subCycle");
-  const renewalInput = document.getElementById("subRenewal");
-  if (!nameInput || !amountInput) return;
-
-  const name = normalizeText(nameInput.value);
-  const categoryId = catInput ? catInput.value : "";
-  const amount = parsePositiveAmount(amountInput.value);
-  const cycle = cycleInput && cycleInput.value === "year" ? "year" : "month";
-  const nextRenewal = renewalInput ? renewalInput.value : "";
-
-  if (!name || amount == null || !categoryId || !nextRenewal) return;
-
-  const category = categories.find((c) => c.id === categoryId);
-  const categoryName = category ? category.name : "";
-
-  const { subscriptions: subsCol } = userCollections(uid);
-  await addDoc(subsCol, {
-    name, categoryId, categoryName, amount, cycle, nextRenewal,
-    status: "active", createdAt: serverTimestamp(),
-  });
-
-  nameInput.value = "";
-  amountInput.value = "";
-  if (renewalInput) renewalInput.value = "";
-  nameInput.focus();
-}
-
-async function paySubscription(subId) {
-  const sub = subscriptions.find((s) => s.id === subId);
-  if (!sub || !sub.categoryId || sub.status === "cancelled") return;
-  // Guard: only payable when due (renewal date is today or past)
-  if (sub.nextRenewal && daysBetween(todayISO(), sub.nextRenewal) > 0) return;
-
-  const category = categories.find((c) => c.id === sub.categoryId);
-  const categoryName = category ? category.name : (sub.categoryName || "(Unknown)");
-  const note = `${sub.name} subscription`;
-
-  const { transactions: txCol, subscriptions: subsCol } = userCollections(uid);
-  await addDoc(txCol, {
-    categoryId: sub.categoryId,
-    categoryName,
-    type: "expense",
-    amount: sub.amount || 0,
-    note,
-    noteLower: note.toLowerCase(),
-    tags: [],
-    dateISO: todayISO(),
-    createdAt: serverTimestamp(),
-  });
-
-  const nextRenewal = advanceRenewal(sub.nextRenewal, sub.cycle);
-  await setDoc(doc(subsCol, subId), { nextRenewal, lastPaidISO: todayISO() }, { merge: true });
-}
-
-async function cancelSubscription(subId) {
-  const { subscriptions: subsCol } = userCollections(uid);
-  await setDoc(doc(subsCol, subId), { status: "cancelled", cancelledAt: serverTimestamp() }, { merge: true });
-}
-
-async function deleteSubscription(subId) {
-  const { subscriptions: subsCol } = userCollections(uid);
-  await deleteDoc(doc(subsCol, subId));
-}
-
-/* ─── Receipt Photos ─── */
-function receiptsCol(txId) {
-  const { transactions: txCol } = userCollections(uid);
-  return collection(doc(txCol, txId), "receipts");
-}
-
-// Resize to a max dimension and re-encode as JPEG to keep each image well under
-// Firestore's 1MB document limit.
-function compressImageToDataUrl(file, maxDim = 1000, quality = 0.7) {
-  return new Promise((resolve, reject) => {
-    if (!file || !file.type || !file.type.startsWith("image/")) { reject(new Error("Not an image")); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width >= height && width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; }
-        else if (height > width && height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = () => reject(new Error("Image decode failed"));
-      img.src = reader.result;
-    };
-    reader.onerror = () => reject(new Error("File read failed"));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function filesToDataUrls(fileList) {
-  const out = [];
-  for (const file of Array.from(fileList || [])) {
-    try { out.push(await compressImageToDataUrl(file)); } catch { /* skip non-image / failures */ }
-  }
-  return out;
-}
-
-async function saveReceiptsForTx(txId, dataUrls) {
-  if (!dataUrls || !dataUrls.length) return;
-  const col = receiptsCol(txId);
-  for (const dataUrl of dataUrls) {
-    await addDoc(col, { dataUrl, createdAt: serverTimestamp() });
-  }
-}
-
-async function bumpReceiptCount(txId, delta) {
-  const tx = transactions.find((t) => t.id === txId);
-  const current = tx && typeof tx.receiptCount === "number" ? tx.receiptCount : 0;
-  const { transactions: txCol } = userCollections(uid);
-  await setDoc(doc(txCol, txId), { receiptCount: Math.max(0, current + delta) }, { merge: true });
-}
-
-// --- Add Record form: pending photo queue ---
-async function queuePendingReceipts(fileList) {
-  const urls = await filesToDataUrls(fileList);
-  pendingReceipts.push(...urls);
-  renderPendingReceipts();
-}
-
-function renderPendingReceipts() {
-  const strip = document.getElementById("txReceiptPreview");
-  if (!strip) return;
-  strip.innerHTML = pendingReceipts.map((url, i) =>
-    `<div class="receipt-thumb">
-      <img src="${url}" alt="Pending photo ${i + 1}" data-action="view-pending" data-idx="${i}" />
-      <button type="button" class="receipt-thumb-remove" data-action="remove-pending" data-idx="${i}" title="Remove">✕</button>
-    </div>`
-  ).join("");
-}
-
-function clearPendingReceipts() {
-  pendingReceipts = [];
-  renderPendingReceipts();
-  const input = document.getElementById("txReceiptInput");
-  if (input) input.value = "";
-}
-
-// --- Viewer modal ---
-async function openReceiptViewer(txId) {
-  receiptViewerTxId = txId;
-  const modal = document.getElementById("receiptViewerModal");
-  if (modal) modal.hidden = false;
-  await refreshReceiptViewer();
-}
-
-function closeReceiptViewer() {
-  receiptViewerTxId = null;
-  const modal = document.getElementById("receiptViewerModal");
-  if (modal) modal.hidden = true;
-  const input = document.getElementById("receiptViewerAddInput");
-  if (input) input.value = "";
-}
-
-async function refreshReceiptViewer() {
-  const grid = document.getElementById("receiptViewerGrid");
-  const status = document.getElementById("receiptViewerStatus");
-  if (!grid || !receiptViewerTxId) return;
-  grid.innerHTML = '<div class="muted small">Loading…</div>';
-  let docs = [];
-  try {
-    const snap = await getDocs(query(receiptsCol(receiptViewerTxId), orderBy("createdAt", "asc")));
-    docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  } catch { /* ignore */ }
-  if (status) status.textContent = docs.length ? `${docs.length} photo${docs.length > 1 ? "s" : ""}` : "";
-  if (!docs.length) { grid.innerHTML = '<div class="muted small">No photos yet. Add some above.</div>'; return; }
-  grid.innerHTML = docs.map((r) =>
-    `<div class="receipt-thumb">
-      <img src="${r.dataUrl}" alt="Photo" data-action="view-receipt" />
-      <button type="button" class="receipt-thumb-remove" data-action="delete-receipt" data-id="${r.id}" title="Delete">✕</button>
-    </div>`
-  ).join("");
-}
-
-async function addReceiptsFromViewer(fileList) {
-  if (!receiptViewerTxId) return;
-  const status = document.getElementById("receiptViewerStatus");
-  if (status) status.textContent = "Adding…";
-  const urls = await filesToDataUrls(fileList);
-  await saveReceiptsForTx(receiptViewerTxId, urls);
-  await bumpReceiptCount(receiptViewerTxId, urls.length);
-  await refreshReceiptViewer();
-}
-
-async function deleteReceiptFromViewer(receiptId) {
-  if (!receiptViewerTxId) return;
-  await deleteDoc(doc(receiptsCol(receiptViewerTxId), receiptId));
-  await bumpReceiptCount(receiptViewerTxId, -1);
-  await refreshReceiptViewer();
-}
-
-function openLightbox(src) {
-  const box = document.getElementById("receiptLightbox");
-  const img = document.getElementById("receiptLightboxImg");
-  if (!box || !img) return;
-  img.src = src;
-  box.hidden = false;
-}
-
-function closeLightbox() {
-  const box = document.getElementById("receiptLightbox");
-  if (box) box.hidden = true;
-}
-
-/* ─── Recurring Transactions ─── */
-function renderRecurringRules() {
-  const container = document.getElementById("recurringContainer");
-  if (!container) return;
-
-  // Populate the category select in the recurring form
-  const recCatSelect = document.getElementById("recurringCategory");
-  if (recCatSelect && recCatSelect.options.length <= 1) {
-    recCatSelect.innerHTML = "";
-    for (const c of categories) {
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = c.name;
-      recCatSelect.appendChild(opt);
-    }
-  }
-
-  if (recurringRules.length === 0) {
-    container.innerHTML = '<div class="muted small">No recurring rules yet.</div>';
-    return;
-  }
-
-  container.innerHTML = recurringRules.map((r) => {
-    const cat = categories.find((c) => c.id === r.categoryId);
-    const catName = cat ? cat.name : "(Unknown)";
-    const typeLabel = r.type === "expense" ? "Expense" : "Revenue";
-    return `<div class="recurring-card">
-      <div class="recurring-info">
-        <div class="recurring-name">${escapeHtml(catName)} — ${escapeHtml(r.note || "")}</div>
-        <div class="recurring-detail">${typeLabel} · ${money(r.amount)} · Day ${r.dayOfMonth || 1} each month</div>
-      </div>
-      <button class="btn btn-danger btn-small" type="button" data-action="delete-recurring" data-id="${r.id}">Delete</button>
-    </div>`;
-  }).join("");
-}
-
-async function addRecurringRule() {
-  const catSelect = document.getElementById("recurringCategory");
-  const typeSelect = document.getElementById("recurringType");
-  const amountInput = document.getElementById("recurringAmount");
-  const noteInput = document.getElementById("recurringNote");
-  const dayInput = document.getElementById("recurringDay");
-
-  if (!catSelect || !amountInput || !dayInput) return;
-
-  const categoryId = catSelect.value;
-  const type = typeSelect ? typeSelect.value : "expense";
-  const amount = parsePositiveAmount(amountInput.value);
-  const note = normalizeText(noteInput ? noteInput.value : "");
-  const dayOfMonth = clamp(parseInt(dayInput.value, 10) || 1, 1, 31);
-
-  if (!categoryId || amount == null) return;
-
-  const category = categories.find((c) => c.id === categoryId);
-  const categoryName = category ? category.name : "(Unknown)";
-
-  const { recurring: recurringCol } = userCollections(uid);
-  await addDoc(recurringCol, { categoryId, categoryName, type, amount, note, dayOfMonth, createdAt: serverTimestamp() });
-
-  amountInput.value = "";
-  if (noteInput) noteInput.value = "";
-  dayInput.value = "";
-}
-
-async function deleteRecurringRule(ruleId) {
-  const { recurring: recurringCol } = userCollections(uid);
-  await deleteDoc(doc(recurringCol, ruleId));
-}
-
-async function autoRunDueRecurring() {
-  if (_hasAutoRunRecurring) return;
-  if (!_recurringLoaded || !_transactionsLoaded) return;
-  _hasAutoRunRecurring = true;
-
-  if (recurringRules.length === 0) return;
-
-  const today = new Date();
-  const dayOfMonth = today.getDate();
-  const dateISO = todayISO();
-
-  const due = recurringRules.filter((r) => (r.dayOfMonth || 1) === dayOfMonth);
-  if (due.length === 0) return;
-
-  const { transactions: txCol } = userCollections(uid);
-  let count = 0;
-  for (const r of due) {
-    const alreadyDone = transactions.some((t) => t.dateISO === dateISO && t.categoryId === r.categoryId && t.amount === r.amount && (t.note || "") === (r.note || ""));
-    if (alreadyDone) continue;
-
-    await addDoc(txCol, {
-      categoryId: r.categoryId,
-      categoryName: r.categoryName || "(Unknown)",
-      type: r.type,
-      amount: r.amount,
-      note: r.note || "",
-      noteLower: (r.note || "").toLowerCase(),
-      dateISO,
-      createdAt: serverTimestamp(),
-    });
-    count++;
-  }
-  if (count > 0) {
-    showUndoToast({ message: `🔁 Auto-added ${count} recurring transaction(s).`, onUndo: () => {} });
-  }
-}
-
-async function runDueRecurring() {
-  const today = new Date();
-  const dayOfMonth = today.getDate();
-  const dateISO = todayISO();
-
-  const due = recurringRules.filter((r) => (r.dayOfMonth || 1) === dayOfMonth);
-  if (due.length === 0) {
-    setAppError("No recurring transactions due today (day " + dayOfMonth + ").");
-    return;
-  }
-
-  const { transactions: txCol } = userCollections(uid);
-  let count = 0;
-  for (const r of due) {
-    // Check if already added today for this rule
-    const alreadyDone = transactions.some((t) => t.dateISO === dateISO && t.categoryId === r.categoryId && t.amount === r.amount && (t.note || "") === (r.note || ""));
-    if (alreadyDone) continue;
-
-    await addDoc(txCol, {
-      categoryId: r.categoryId,
-      categoryName: r.categoryName || "(Unknown)",
-      type: r.type,
-      amount: r.amount,
-      note: r.note || "",
-      noteLower: (r.note || "").toLowerCase(),
-      dateISO,
-      createdAt: serverTimestamp(),
-    });
-    count++;
-  }
-  setAppError(count > 0 ? `✅ Added ${count} recurring transaction(s).` : "All due recurring transactions already recorded today.");
-}
+/* ─── Recurring Transactions → extracted to js/features/recurring.js (createRecurring) ─── */
 
 /* ─── Settings: Currency ─── */
 async function saveCurrencySymbol() {
@@ -5275,8 +4640,7 @@ function wireEvents() {
     txReceiptPreview.addEventListener("click", (e) => {
       const removeBtn = e.target.closest("[data-action='remove-pending']");
       if (removeBtn) {
-        pendingReceipts.splice(Number(removeBtn.dataset.idx), 1);
-        renderPendingReceipts();
+        removePendingAt(Number(removeBtn.dataset.idx));
         return;
       }
       const img = e.target.closest("img[data-action='view-pending']");
