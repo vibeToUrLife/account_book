@@ -540,6 +540,7 @@ async function renderStatsChart(range, start, endExclusive) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    cutout: "62%",
     plugins: {
       legend: {
         position: "bottom",
@@ -562,11 +563,34 @@ async function renderStatsChart(range, start, endExclusive) {
     statsChartInstance.destroy();
   }
 
+  // Draw "Total <amount>" in the doughnut's center hole.
+  const centerTextPlugin = {
+    id: "donutCenterText",
+    afterDraw(chart) {
+      const { ctx: c, chartArea } = chart;
+      if (!chartArea) return;
+      const cx = (chartArea.left + chartArea.right) / 2;
+      const cy = (chartArea.top + chartArea.bottom) / 2;
+      c.save();
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillStyle = text;
+      c.font = "600 12px system-ui, -apple-system, sans-serif";
+      c.globalAlpha = 0.7;
+      c.fillText("Total", cx, cy - 11);
+      c.globalAlpha = 1;
+      c.font = "700 17px system-ui, -apple-system, sans-serif";
+      c.fillText(money(totalExpense), cx, cy + 8);
+      c.restore();
+    },
+  };
+
   try {
     statsChartInstance = new Chart(ctx, {
-      type: "pie",
+      type: "doughnut",
       data,
       options,
+      plugins: [centerTextPlugin],
     });
     setStatsChartMessage("");
   } catch {
