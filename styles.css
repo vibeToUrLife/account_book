@@ -1934,11 +1934,12 @@ body {
 .insight-hero-sub b { font-weight: 700; }
 
 .insight-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .insight-tile {
+  flex: 1 1 90px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1948,6 +1949,7 @@ body {
   border: 1px solid var(--border);
   text-align: center;
 }
+.insight-tile-value { overflow-wrap: anywhere; }
 .insight-tile-label { font-size: 12px; color: var(--muted); }
 .insight-tile-value { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
@@ -2282,11 +2284,11 @@ body {
 }
 .debt-summary-item {
   flex: 1;
-  min-width: 110px;
+  min-width: 92px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   background: var(--stat-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
