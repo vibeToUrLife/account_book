@@ -1917,6 +1917,80 @@ body {
   font-weight: 600;
 }
 
+/* -- Friendly insights -- */
+.insight-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--stat-bg);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), var(--stat-bg));
+  border: 1px solid var(--border);
+}
+.insight-hero-emoji { font-size: 32px; line-height: 1; }
+.insight-hero-title { font-size: 16px; font-weight: 800; }
+.insight-hero-sub { font-size: 13px; color: var(--text); margin-top: 2px; }
+.insight-hero-sub b { font-weight: 700; }
+
+.insight-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.insight-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.insight-tile-label { font-size: 12px; color: var(--muted); }
+.insight-tile-value { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.insight-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.insight-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+}
+.insight-chip.insight-good { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, var(--border)); }
+.insight-chip.insight-warn { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+.insight-chip-arrow { font-weight: 800; }
+
+.insight-bars { display: flex; flex-direction: column; gap: 10px; }
+.insight-bar-row { display: flex; flex-direction: column; gap: 4px; }
+.insight-bar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; font-weight: 600; }
+.insight-bar-head .muted { font-weight: 500; }
+.insight-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.insight-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+.insight-bar-fill.over { background: var(--danger); }
+.insight-line { font-size: 13px; line-height: 1.6; }
+.insight-line + .insight-line { margin-top: 0; }
+/* ensure semantic colors work outside .insight-card too (e.g. in the hero) */
+.insight-hero .insight-good, .insight-tile .insight-good { color: var(--success); }
+.insight-hero .insight-warn, .insight-tile .insight-warn { color: var(--danger); }
+
+@media (max-width: 420px) {
+  .insight-tile-value { font-size: 14px; }
+}
+
 /* ─── Receipt Scan Modal ─── */
 .receipt-scan-body {
   display: flex;

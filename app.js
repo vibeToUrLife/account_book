@@ -2814,110 +2814,129 @@ function generateInsights() {
   }
 
   const cards = [];
-
-  // 1. Monthly Overview
   const netCur = curRevenue - curExpense;
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const dayOfMonth = now.getDate();
   const dailyAvg = dayOfMonth > 0 ? curExpense / dayOfMonth : 0;
   const projected = dailyAvg * daysInMonth;
+  const monthName = now.toLocaleDateString(undefined, { month: "long" });
 
-  cards.push(`<div class="insight-card">
-    <h4>📊 This Month Overview</h4>
-    <ul>
-      <li>Total Expense: <span class="insight-warn">${money(curExpense)}</span></li>
-      <li>Total Revenue: <span class="insight-good">${money(curRevenue)}</span></li>
-      <li>Net: <span class="${netCur >= 0 ? 'insight-good' : 'insight-warn'}">${money(netCur)}</span></li>
-      <li>Daily Average Spending: <span class="insight-highlight">${money(dailyAvg)}</span></li>
-      <li>Projected Month-End Expense: <span class="insight-highlight">${money(projected)}</span></li>
-    </ul>
+  // 1. Friendly headline
+  let heroSub;
+  if (curExpense === 0 && curRevenue === 0) {
+    heroSub = "Nothing logged this month yet — add a record to get started! ✏️";
+  } else if (netCur >= 0) {
+    heroSub = `You're up <b class="insight-good">${money(netCur)}</b> so far — nice going! 🎉`;
+  } else {
+    heroSub = `You've spent <b class="insight-warn">${money(-netCur)}</b> more than you earned this month. 👀`;
+  }
+  cards.push(`<div class="insight-hero">
+    <div class="insight-hero-emoji">👋</div>
+    <div>
+      <div class="insight-hero-title">Your ${escapeHtml(monthName)} so far</div>
+      <div class="insight-hero-sub">${heroSub}</div>
+    </div>
   </div>`);
 
-  // 2. Month-over-month comparison
+  // Nothing more to show if the month is empty
+  if (curExpense === 0 && curRevenue === 0) {
+    els.insightsContent.innerHTML = cards.join("");
+    return;
+  }
+
+  // 2. Overview tiles
+  const projLine = (dayOfMonth < daysInMonth && curExpense > 0)
+    ? `<div class="insight-line muted small">📈 On track to spend about <b>${money(projected)}</b> by month-end (≈ ${money(dailyAvg)}/day).</div>`
+    : "";
+  cards.push(`<div class="insight-card">
+    <div class="insight-tiles">
+      <div class="insight-tile"><span class="insight-tile-label">💸 Spent</span><span class="insight-tile-value insight-warn">${money(curExpense)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">💵 Earned</span><span class="insight-tile-value insight-good">${money(curRevenue)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">💎 Net</span><span class="insight-tile-value ${netCur >= 0 ? 'insight-good' : 'insight-warn'}">${money(netCur)}</span></div>
+    </div>
+    ${projLine}
+  </div>`);
+
+  // 3. vs Last month — compact chips
   if (prevExpense > 0 || prevRevenue > 0) {
+    const chip = (label, change, higherIsBad) => {
+      const flat = Math.abs(change) < 0.05;
+      const up = change > 0;
+      const arrow = flat ? "→" : up ? "↑" : "↓";
+      const cls = flat ? "" : (up !== higherIsBad ? "insight-good" : "insight-warn");
+      const word = flat ? "about the same" : `${Math.abs(change).toFixed(0)}% ${up ? "more" : "less"}`;
+      return `<div class="insight-chip ${cls}"><span class="insight-chip-arrow">${arrow}</span> ${label} ${word}</div>`;
+    };
     const expChange = prevExpense > 0 ? ((curExpense - prevExpense) / prevExpense * 100) : 0;
     const revChange = prevRevenue > 0 ? ((curRevenue - prevRevenue) / prevRevenue * 100) : 0;
-    const expArrow = expChange > 0 ? "↑" : expChange < 0 ? "↓" : "→";
-    const revArrow = revChange > 0 ? "↑" : revChange < 0 ? "↓" : "→";
-
     cards.push(`<div class="insight-card">
-      <h4>📈 vs Last Month</h4>
-      <ul>
-        <li>Expenses: ${expArrow} <span class="${expChange > 0 ? 'insight-warn' : 'insight-good'}">${Math.abs(expChange).toFixed(1)}% ${expChange > 0 ? 'more' : 'less'}</span> (was ${money(prevExpense)})</li>
-        <li>Revenue: ${revArrow} <span class="${revChange >= 0 ? 'insight-good' : 'insight-warn'}">${Math.abs(revChange).toFixed(1)}% ${revChange >= 0 ? 'more' : 'less'}</span> (was ${money(prevRevenue)})</li>
-      </ul>
+      <h4>📈 Compared to last month</h4>
+      <div class="insight-chips">
+        ${chip("spending", expChange, true)}
+        ${chip("income", revChange, false)}
+      </div>
     </div>`);
   }
 
-  // 3. Top spending categories
+  // 4. Where your money went — bars
   if (catSpend.size > 0) {
-    const sorted = [...catSpend.entries()].sort((a, b) => b[1] - a[1]);
-    const top5 = sorted.slice(0, 5);
-    const topItems = top5.map(([name, amount], i) => {
-      const pct = curExpense > 0 ? (amount / curExpense * 100).toFixed(1) : 0;
-      return `<li>${i + 1}. ${escapeHtml(name)}: <span class="insight-highlight">${money(amount)}</span> (${pct}%)</li>`;
+    const sorted = [...catSpend.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const maxAmount = sorted[0][1] || 1;
+    const bars = sorted.map(([name, amount]) => {
+      const pctTotal = curExpense > 0 ? Math.round(amount / curExpense * 100) : 0;
+      const barW = Math.round(amount / maxAmount * 100);
+      return `<div class="insight-bar-row">
+        <div class="insight-bar-head"><span>${escapeHtml(name)}</span><span class="muted">${money(amount)} · ${pctTotal}%</span></div>
+        <div class="insight-bar-track"><div class="insight-bar-fill" style="width:${barW}%"></div></div>
+      </div>`;
     }).join("");
-
     cards.push(`<div class="insight-card">
-      <h4>🏆 Top Spending Categories</h4>
-      <ul>${topItems}</ul>
+      <h4>🏆 Where your money went</h4>
+      <div class="insight-bars">${bars}</div>
     </div>`);
   }
 
-  // 4. Budget alerts
+  // 5. Budgets to watch — progress rows
   const budgetAlerts = [];
   for (const cat of categories) {
     if (!cat.budget || cat.budget <= 0) continue;
-    const period = cat.budgetPeriod || "month";
-    if (period !== "month") continue;
+    if ((cat.budgetPeriod || "month") !== "month") continue;
     const spent = curMonthTxs.filter((t) => t.categoryId === cat.id && t.type === "expense").reduce((s, t) => s + t.amount, 0);
     const pct = (spent / cat.budget) * 100;
-    if (pct >= 80) {
-      budgetAlerts.push({ name: cat.name, spent, budget: cat.budget, pct });
-    }
+    if (pct >= 80) budgetAlerts.push({ name: cat.name, spent, budget: cat.budget, pct });
   }
   if (budgetAlerts.length > 0) {
-    const alertItems = budgetAlerts.map((a) => {
-      const cls = a.pct > 100 ? 'insight-warn' : 'insight-highlight';
-      const label = a.pct > 100
-        ? `⚠️ Over by ${money(a.spent - a.budget)}`
-        : a.pct >= 100 ? '✅ Fully used' : `⚡ ${a.pct.toFixed(0)}% used`;
-      return `<li>${escapeHtml(a.name)}: ${money(a.spent)} / ${money(a.budget)} — <span class="${cls}">${label}</span></li>`;
+    const rows = budgetAlerts.map((a) => {
+      const over = a.pct > 100;
+      const badge = over ? `⚠️ Over by ${money(a.spent - a.budget)}` : a.pct >= 100 ? "✅ Fully used" : `⚡ ${a.pct.toFixed(0)}%`;
+      return `<div class="insight-bar-row">
+        <div class="insight-bar-head"><span>${escapeHtml(a.name)}</span><span class="${over ? 'insight-warn' : 'insight-highlight'}">${badge}</span></div>
+        <div class="insight-bar-track"><div class="insight-bar-fill ${over ? 'over' : ''}" style="width:${Math.min(100, a.pct)}%"></div></div>
+      </div>`;
     }).join("");
-
     cards.push(`<div class="insight-card">
-      <h4>🚨 Budget Alerts</h4>
-      <ul>${alertItems}</ul>
+      <h4>🚨 Budgets to watch</h4>
+      <div class="insight-bars">${rows}</div>
     </div>`);
   }
 
-  // 5. Spending pattern (weekday vs weekend)
-  const weekdaySpend = { total: 0, count: 0 };
-  const weekendSpend = { total: 0, count: 0 };
+  // 6. Habit — one friendly line
+  const weekday = { total: 0, count: 0 };
+  const weekend = { total: 0, count: 0 };
   for (const tx of curMonthTxs) {
     if (tx.type !== "expense") continue;
-    const d = new Date(tx.dateISO);
-    const day = d.getDay();
-    if (day === 0 || day === 6) {
-      weekendSpend.total += tx.amount;
-      weekendSpend.count++;
-    } else {
-      weekdaySpend.total += tx.amount;
-      weekdaySpend.count++;
-    }
+    const day = new Date(tx.dateISO).getDay();
+    const bucket = (day === 0 || day === 6) ? weekend : weekday;
+    bucket.total += tx.amount;
+    bucket.count++;
   }
-  if (weekdaySpend.count > 0 || weekendSpend.count > 0) {
-    const wdAvg = weekdaySpend.count > 0 ? weekdaySpend.total / weekdaySpend.count : 0;
-    const weAvg = weekendSpend.count > 0 ? weekendSpend.total / weekendSpend.count : 0;
-    const higher = weAvg > wdAvg ? "weekends" : "weekdays";
-
+  if (weekday.count > 0 && weekend.count > 0) {
+    const wdAvg = weekday.total / weekday.count;
+    const weAvg = weekend.total / weekend.count;
+    const moreWeekend = weAvg > wdAvg;
     cards.push(`<div class="insight-card">
-      <h4>📅 Spending Pattern</h4>
-      <ul>
-        <li>Avg per weekday transaction: <span class="insight-highlight">${money(wdAvg)}</span> (${weekdaySpend.count} txns)</li>
-        <li>Avg per weekend transaction: <span class="insight-highlight">${money(weAvg)}</span> (${weekendSpend.count} txns)</li>
-        <li>You tend to spend more on <strong>${higher}</strong></li>
-      </ul>
+      <h4>🗓️ Your habit</h4>
+      <div class="insight-line">You spend more on <strong>${moreWeekend ? "weekends" : "weekdays"}</strong> — about <b class="insight-highlight">${money(moreWeekend ? weAvg : wdAvg)}</b> per transaction vs ${money(moreWeekend ? wdAvg : weAvg)}.</div>
     </div>`);
   }
 
