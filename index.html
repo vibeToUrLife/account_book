@@ -182,6 +182,12 @@
               <input id="txTags" type="text" placeholder="e.g., work, urgent" maxlength="80" />
             </label>
 
+            <label class="field">
+              <span>📎 Photos <span class="muted small">(receipt or item, optional)</span></span>
+              <input id="txReceiptInput" type="file" accept="image/*" multiple />
+              <div id="txReceiptPreview" class="receipt-preview-strip"></div>
+            </label>
+
             <div id="duplicateWarning" class="callout callout-warning small" hidden role="alert">
               ⚠️ Similar record exists — same date, category & amount. Still add?
             </div>
@@ -905,6 +911,31 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Receipt Viewer Modal -->
+      <div id="receiptViewerModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal" role="dialog" aria-modal="true" aria-label="Receipt photos">
+          <div class="edit-modal-header">
+            <h3>📎 Photos</h3>
+            <button id="closeReceiptViewer" class="btn btn-secondary btn-small" type="button">✕</button>
+          </div>
+          <div class="receipt-viewer-body">
+            <div class="row wrap" style="gap:8px; margin-bottom:10px;">
+              <label class="btn btn-secondary btn-small" style="cursor:pointer;">
+                ➕ Add Photos
+                <input id="receiptViewerAddInput" type="file" accept="image/*" multiple hidden />
+              </label>
+              <span id="receiptViewerStatus" class="muted small"></span>
+            </div>
+            <div id="receiptViewerGrid" class="receipt-viewer-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Receipt Lightbox -->
+      <div id="receiptLightbox" class="receipt-lightbox" hidden>
+        <img id="receiptLightboxImg" alt="Receipt full view" />
       </div>
 
     </main>

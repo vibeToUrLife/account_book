@@ -1961,6 +1961,64 @@ body {
   line-height: 1.8;
 }
 
+/* -- Receipt photo attachments -- */
+.receipt-preview-strip,
+.receipt-viewer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.receipt-viewer-grid { margin-top: 0; }
+.receipt-thumb {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--stat-bg);
+}
+.receipt-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: zoom-in;
+  display: block;
+}
+.receipt-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+}
+.receipt-viewer-body { max-height: 60vh; overflow-y: auto; }
+.receipt-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  cursor: zoom-out;
+  padding: 20px;
+}
+.receipt-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-sm);
+}
+
 /* ─── Dashboard ─── */
 .dashboard-grid {
   display: grid;
@@ -2158,6 +2216,13 @@ body {
 .debt-settled-tag { color: var(--success); font-size: 12px; font-weight: 600; }
 .debt-amount.revenue, .debt-summary-value.revenue { color: var(--success); }
 .debt-amount.expense, .debt-summary-value.expense { color: var(--danger); }
+
+/* Stack debt/subscription cards on narrow phones so buttons don't crowd the name */
+@media (max-width: 560px) {
+  .debt-card { flex-direction: column; align-items: stretch; gap: 8px; }
+  .debt-actions { justify-content: flex-end; flex-wrap: wrap; }
+  .debt-actions .btn { flex: 1; min-width: 88px; text-align: center; }
+}
 
 /* ==============================================
    MOBILE ENHANCEMENTS

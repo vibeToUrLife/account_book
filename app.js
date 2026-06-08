@@ -26,10 +26,12 @@ import {
 } from "./utils.js?v=5";
 
 const {
+  collection,
   addDoc,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   onSnapshot,
   orderBy,
@@ -209,6 +211,8 @@ let recurringRules = [];
 let templates = [];
 let debts = [];
 let subscriptions = [];
+let pendingReceipts = [];   // dataURLs queued on the Add Record form
+let receiptViewerTxId = null;
 let unsubSettings = null;
 let unsubGoals = null;
 let unsubRecurring = null;
@@ -1115,6 +1119,7 @@ function renderTransactionsTable() {
       <td data-label="Note">${escapeHtml(tx.note || "")}${tagsHtml}</td>
       <td>
         <div class="row-actions">
+          <button class="btn btn-secondary btn-small" type="button" data-action="receipts-tx" data-id="${tx.id}" title="Photos">📎${tx.receiptCount ? " " + tx.receiptCount : ""}</button>
           <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${tx.id}">Edit</button>
           <button class="btn btn-danger btn-small" type="button" data-action="delete-tx" data-id="${tx.id}">Delete</button>
         </div>
@@ -1506,7 +1511,8 @@ async function addTransaction() {
 
   const { transactions: txCol } = userCollections(uid);
 
-  await addDoc(txCol, {
+  const queued = pendingReceipts.slice();
+  const ref = await addDoc(txCol, {
     categoryId,
     categoryName,
     type,
@@ -1515,8 +1521,14 @@ async function addTransaction() {
     noteLower: note.toLowerCase(),
     tags,
     dateISO,
+    receiptCount: queued.length,
     createdAt: serverTimestamp(),
   });
+
+  if (queued.length) {
+    await saveReceiptsForTx(ref.id, queued);
+  }
+  clearPendingReceipts();
 
   lastUsedCategoryId = categoryId;
   if (els.txAmount._bankPrefill) els.txAmount._bankPrefill(0);
@@ -1795,6 +1807,11 @@ function cancelTxEdit() {
 
 async function deleteTransactionById(txId) {
   const { transactions: txCol } = userCollections(uid);
+  // Remove attached receipt photos first (subcollections aren't auto-deleted).
+  try {
+    const snap = await getDocs(receiptsCol(txId));
+    for (const d of snap.docs) await deleteDoc(d.ref);
+  } catch { /* ignore */ }
   await deleteDoc(doc(txCol, txId));
 }
 
@@ -3761,6 +3778,152 @@ async function deleteSubscription(subId) {
   await deleteDoc(doc(subsCol, subId));
 }
 
+/* ─── Receipt Photos ─── */
+function receiptsCol(txId) {
+  const { transactions: txCol } = userCollections(uid);
+  return collection(doc(txCol, txId), "receipts");
+}
+
+// Resize to a max dimension and re-encode as JPEG to keep each image well under
+// Firestore's 1MB document limit.
+function compressImageToDataUrl(file, maxDim = 1000, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type || !file.type.startsWith("image/")) { reject(new Error("Not an image")); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width >= height && width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; }
+        else if (height > width && height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => reject(new Error("Image decode failed"));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error("File read failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function filesToDataUrls(fileList) {
+  const out = [];
+  for (const file of Array.from(fileList || [])) {
+    try { out.push(await compressImageToDataUrl(file)); } catch { /* skip non-image / failures */ }
+  }
+  return out;
+}
+
+async function saveReceiptsForTx(txId, dataUrls) {
+  if (!dataUrls || !dataUrls.length) return;
+  const col = receiptsCol(txId);
+  for (const dataUrl of dataUrls) {
+    await addDoc(col, { dataUrl, createdAt: serverTimestamp() });
+  }
+}
+
+async function bumpReceiptCount(txId, delta) {
+  const tx = transactions.find((t) => t.id === txId);
+  const current = tx && typeof tx.receiptCount === "number" ? tx.receiptCount : 0;
+  const { transactions: txCol } = userCollections(uid);
+  await setDoc(doc(txCol, txId), { receiptCount: Math.max(0, current + delta) }, { merge: true });
+}
+
+// --- Add Record form: pending photo queue ---
+async function queuePendingReceipts(fileList) {
+  const urls = await filesToDataUrls(fileList);
+  pendingReceipts.push(...urls);
+  renderPendingReceipts();
+}
+
+function renderPendingReceipts() {
+  const strip = document.getElementById("txReceiptPreview");
+  if (!strip) return;
+  strip.innerHTML = pendingReceipts.map((url, i) =>
+    `<div class="receipt-thumb">
+      <img src="${url}" alt="Pending photo ${i + 1}" data-action="view-pending" data-idx="${i}" />
+      <button type="button" class="receipt-thumb-remove" data-action="remove-pending" data-idx="${i}" title="Remove">✕</button>
+    </div>`
+  ).join("");
+}
+
+function clearPendingReceipts() {
+  pendingReceipts = [];
+  renderPendingReceipts();
+  const input = document.getElementById("txReceiptInput");
+  if (input) input.value = "";
+}
+
+// --- Viewer modal ---
+async function openReceiptViewer(txId) {
+  receiptViewerTxId = txId;
+  const modal = document.getElementById("receiptViewerModal");
+  if (modal) modal.hidden = false;
+  await refreshReceiptViewer();
+}
+
+function closeReceiptViewer() {
+  receiptViewerTxId = null;
+  const modal = document.getElementById("receiptViewerModal");
+  if (modal) modal.hidden = true;
+  const input = document.getElementById("receiptViewerAddInput");
+  if (input) input.value = "";
+}
+
+async function refreshReceiptViewer() {
+  const grid = document.getElementById("receiptViewerGrid");
+  const status = document.getElementById("receiptViewerStatus");
+  if (!grid || !receiptViewerTxId) return;
+  grid.innerHTML = '<div class="muted small">Loading…</div>';
+  let docs = [];
+  try {
+    const snap = await getDocs(query(receiptsCol(receiptViewerTxId), orderBy("createdAt", "asc")));
+    docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch { /* ignore */ }
+  if (status) status.textContent = docs.length ? `${docs.length} photo${docs.length > 1 ? "s" : ""}` : "";
+  if (!docs.length) { grid.innerHTML = '<div class="muted small">No photos yet. Add some above.</div>'; return; }
+  grid.innerHTML = docs.map((r) =>
+    `<div class="receipt-thumb">
+      <img src="${r.dataUrl}" alt="Photo" data-action="view-receipt" />
+      <button type="button" class="receipt-thumb-remove" data-action="delete-receipt" data-id="${r.id}" title="Delete">✕</button>
+    </div>`
+  ).join("");
+}
+
+async function addReceiptsFromViewer(fileList) {
+  if (!receiptViewerTxId) return;
+  const status = document.getElementById("receiptViewerStatus");
+  if (status) status.textContent = "Adding…";
+  const urls = await filesToDataUrls(fileList);
+  await saveReceiptsForTx(receiptViewerTxId, urls);
+  await bumpReceiptCount(receiptViewerTxId, urls.length);
+  await refreshReceiptViewer();
+}
+
+async function deleteReceiptFromViewer(receiptId) {
+  if (!receiptViewerTxId) return;
+  await deleteDoc(doc(receiptsCol(receiptViewerTxId), receiptId));
+  await bumpReceiptCount(receiptViewerTxId, -1);
+  await refreshReceiptViewer();
+}
+
+function openLightbox(src) {
+  const box = document.getElementById("receiptLightbox");
+  const img = document.getElementById("receiptLightboxImg");
+  if (!box || !img) return;
+  img.src = src;
+  box.hidden = false;
+}
+
+function closeLightbox() {
+  const box = document.getElementById("receiptLightbox");
+  if (box) box.hidden = true;
+}
+
 /* ─── Recurring Transactions ─── */
 function renderRecurringRules() {
   const container = document.getElementById("recurringContainer");
@@ -4536,6 +4699,10 @@ function wireEvents() {
       openEditModal(id);
       return;
     }
+    if (action === "receipts-tx") {
+      openReceiptViewer(id);
+      return;
+    }
   });
 
   const debouncedSearch = debounce(() => {
@@ -4921,6 +5088,54 @@ function wireEvents() {
   if (subShowCancelled) {
     subShowCancelled.addEventListener("change", renderSubscriptions);
   }
+
+  // ── Receipt Photos ──
+  const txReceiptInput = document.getElementById("txReceiptInput");
+  if (txReceiptInput) {
+    txReceiptInput.addEventListener("change", (e) => {
+      queuePendingReceipts(e.target.files);
+      e.target.value = "";
+    });
+  }
+  const txReceiptPreview = document.getElementById("txReceiptPreview");
+  if (txReceiptPreview) {
+    txReceiptPreview.addEventListener("click", (e) => {
+      const removeBtn = e.target.closest("[data-action='remove-pending']");
+      if (removeBtn) {
+        pendingReceipts.splice(Number(removeBtn.dataset.idx), 1);
+        renderPendingReceipts();
+        return;
+      }
+      const img = e.target.closest("img[data-action='view-pending']");
+      if (img) openLightbox(img.src);
+    });
+  }
+  const closeReceiptViewerBtn = document.getElementById("closeReceiptViewer");
+  if (closeReceiptViewerBtn) closeReceiptViewerBtn.addEventListener("click", closeReceiptViewer);
+  const receiptViewerModal = document.getElementById("receiptViewerModal");
+  if (receiptViewerModal) {
+    receiptViewerModal.addEventListener("click", (e) => {
+      if (e.target === receiptViewerModal) closeReceiptViewer();
+    });
+  }
+  const receiptViewerAddInput = document.getElementById("receiptViewerAddInput");
+  if (receiptViewerAddInput) {
+    receiptViewerAddInput.addEventListener("change", (e) => {
+      addReceiptsFromViewer(e.target.files);
+      e.target.value = "";
+    });
+  }
+  const receiptViewerGrid = document.getElementById("receiptViewerGrid");
+  if (receiptViewerGrid) {
+    receiptViewerGrid.addEventListener("click", (e) => {
+      const delBtn = e.target.closest("[data-action='delete-receipt']");
+      if (delBtn && delBtn.dataset.id) { deleteReceiptFromViewer(delBtn.dataset.id); return; }
+      const img = e.target.closest("img[data-action='view-receipt']");
+      if (img) openLightbox(img.src);
+    });
+  }
+  const receiptLightbox = document.getElementById("receiptLightbox");
+  if (receiptLightbox) receiptLightbox.addEventListener("click", closeLightbox);
 
   // ── Recurring Transactions ──
   const recurringForm = document.getElementById("recurringForm");
