@@ -207,10 +207,12 @@ let currencySymbol = "";
 let savingsGoals = [];
 let recurringRules = [];
 let templates = [];
+let debts = [];
 let unsubSettings = null;
 let unsubGoals = null;
 let unsubRecurring = null;
 let unsubTemplates = null;
+let unsubDebts = null;
 
 // Budget notification tracking (avoid repeat alerts in one session)
 let budgetAlertsEnabled = localStorage.getItem("accountBook.budgetAlerts") === "on";
@@ -1220,13 +1222,14 @@ function renderAll() {
 }
 
 async function startListenersForUser(userId) {
-  const { categories: categoriesCol, transactions: txCol, settings: settingsCol, savingsGoals: goalsCol, recurring: recurringCol } = userCollections(userId);
+  const { categories: categoriesCol, transactions: txCol, settings: settingsCol, savingsGoals: goalsCol, recurring: recurringCol, debts: debtsCol } = userCollections(userId);
 
   if (unsubCategories) unsubCategories();
   if (unsubTransactions) unsubTransactions();
   if (unsubSettings) unsubSettings();
   if (unsubGoals) unsubGoals();
   if (unsubRecurring) unsubRecurring();
+  if (unsubDebts) unsubDebts();
 
   // Listen to user settings (currency, etc.)
   unsubSettings = onSnapshot(doc(settingsCol, "preferences"), (snap) => {
@@ -1242,6 +1245,12 @@ async function startListenersForUser(userId) {
   unsubGoals = onSnapshot(query(goalsCol, orderBy("createdAt", "asc")), (snap) => {
     savingsGoals = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderSavingsGoals();
+  });
+
+  // Listen to debts / lending ledger
+  unsubDebts = onSnapshot(query(debtsCol, orderBy("createdAt", "desc")), (snap) => {
+    debts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderDebts();
   });
 
   // Listen to recurring rules
@@ -1295,12 +1304,14 @@ function stopListeners() {
   if (unsubGoals) unsubGoals();
   if (unsubRecurring) unsubRecurring();
   if (unsubTemplates) unsubTemplates();
+  if (unsubDebts) unsubDebts();
   unsubCategories = null;
   unsubTransactions = null;
   unsubSettings = null;
   unsubGoals = null;
   unsubRecurring = null;
   unsubTemplates = null;
+  unsubDebts = null;
 }
 
 function setSignedOutUi() {
@@ -1311,6 +1322,7 @@ function setSignedOutUi() {
   savingsGoals = [];
   recurringRules = [];
   templates = [];
+  debts = [];
   currencySymbol = "";
   _recurringLoaded = false;
   _transactionsLoaded = false;
@@ -3481,6 +3493,104 @@ async function deleteSavingsGoal(goalId) {
   await deleteDoc(doc(goalsCol, goalId));
 }
 
+/* ─── Debts / Lending ─── */
+function renderDebts() {
+  const container = document.getElementById("debtsContainer");
+  const summary = document.getElementById("debtSummary");
+  if (!container) return;
+
+  const showSettled = !!document.getElementById("debtShowSettled")?.checked;
+
+  // Summary (outstanding only)
+  const outstanding = debts.filter((d) => d.status !== "settled");
+  const owedToMe = outstanding.filter((d) => d.direction === "owed_to_me").reduce((s, d) => s + (d.amount || 0), 0);
+  const iOwe = outstanding.filter((d) => d.direction === "i_owe").reduce((s, d) => s + (d.amount || 0), 0);
+  const net = owedToMe - iOwe;
+  if (summary) {
+    const netCls = net >= 0 ? "revenue" : "expense";
+    summary.innerHTML = `
+      <div class="debt-summary-item"><span class="debt-summary-label">Owed to me</span><span class="debt-summary-value revenue">${money(owedToMe)}</span></div>
+      <div class="debt-summary-item"><span class="debt-summary-label">I owe</span><span class="debt-summary-value expense">${money(iOwe)}</span></div>
+      <div class="debt-summary-item"><span class="debt-summary-label">Net</span><span class="debt-summary-value ${netCls}">${money(net)}</span></div>`;
+  }
+
+  const visible = showSettled ? debts : outstanding;
+  if (visible.length === 0) {
+    container.innerHTML = '<div class="muted small">No debts to show.</div>';
+    return;
+  }
+
+  const today = todayISO();
+  container.innerHTML = visible.map((d) => {
+    const settled = d.status === "settled";
+    const isOwedToMe = d.direction === "owed_to_me";
+    const dirLabel = isOwedToMe ? "owes me" : "I owe";
+    const amtCls = isOwedToMe ? "revenue" : "expense";
+    const overdue = !settled && d.dueDate && d.dueDate < today;
+    const due = d.dueDate
+      ? `<span class="debt-due ${overdue ? "overdue" : ""}">Due ${escapeHtml(d.dueDate)}${overdue ? " · overdue" : ""}</span>`
+      : "";
+    const note = d.note ? `<span class="debt-note">${escapeHtml(d.note)}</span>` : "";
+    return `<div class="debt-card ${settled ? "settled" : ""}">
+      <div class="debt-info">
+        <div class="debt-name">${escapeHtml(d.person || "?")} <span class="debt-dir">${dirLabel}</span> <span class="debt-amount ${amtCls}">${money(d.amount || 0)}</span></div>
+        <div class="debt-meta">${escapeHtml(d.dateISO || "")} ${due} ${note}</div>
+      </div>
+      <div class="debt-actions">
+        ${settled
+          ? `<span class="debt-settled-tag">✅ Settled</span>`
+          : `<button class="btn btn-secondary btn-small" type="button" data-action="settle-debt" data-id="${d.id}">Mark paid</button>`}
+        <button class="btn btn-danger btn-small" type="button" data-action="delete-debt" data-id="${d.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function addDebt() {
+  const personInput = document.getElementById("debtPerson");
+  const directionInput = document.getElementById("debtDirection");
+  const amountInput = document.getElementById("debtAmount");
+  const noteInput = document.getElementById("debtNote");
+  const dueInput = document.getElementById("debtDueDate");
+  if (!personInput || !amountInput) return;
+
+  const person = normalizeText(personInput.value);
+  const direction = directionInput && directionInput.value === "i_owe" ? "i_owe" : "owed_to_me";
+  const amount = parsePositiveAmount(amountInput.value);
+  const note = noteInput ? normalizeText(noteInput.value) : "";
+  const dueDate = dueInput ? dueInput.value : "";
+
+  if (!person || amount == null) return;
+
+  const { debts: debtsCol } = userCollections(uid);
+  await addDoc(debtsCol, {
+    person,
+    direction,
+    amount,
+    note,
+    dateISO: todayISO(),
+    dueDate,
+    status: "outstanding",
+    createdAt: serverTimestamp(),
+  });
+
+  personInput.value = "";
+  amountInput.value = "";
+  if (noteInput) noteInput.value = "";
+  if (dueInput) dueInput.value = "";
+  personInput.focus();
+}
+
+async function settleDebt(debtId) {
+  const { debts: debtsCol } = userCollections(uid);
+  await setDoc(doc(debtsCol, debtId), { status: "settled", settledAt: serverTimestamp() }, { merge: true });
+}
+
+async function deleteDebt(debtId) {
+  const { debts: debtsCol } = userCollections(uid);
+  await deleteDoc(doc(debtsCol, debtId));
+}
+
 /* ─── Recurring Transactions ─── */
 function renderRecurringRules() {
   const container = document.getElementById("recurringContainer");
@@ -3639,6 +3749,7 @@ function exportDataAsJson() {
     transactions: transactions.map((t) => ({ ...t })),
     savingsGoals: savingsGoals.map((g) => ({ ...g })),
     recurringRules: recurringRules.map((r) => ({ ...r })),
+    debts: debts.map((d) => ({ ...d })),
     settings: { currencySymbol },
   };
 
@@ -3667,7 +3778,7 @@ async function importDataFromJson(file) {
 
     if (statusEl) statusEl.textContent = "Importing…";
 
-    const { categories: catCol, transactions: txCol, savingsGoals: goalsCol, recurring: recCol, settings: settingsCol } = userCollections(uid);
+    const { categories: catCol, transactions: txCol, savingsGoals: goalsCol, recurring: recCol, settings: settingsCol, debts: debtsCol } = userCollections(uid);
 
     // Import categories
     let catCount = 0;
@@ -3714,12 +3825,27 @@ async function importDataFromJson(file) {
       }
     }
 
+    // Import debts
+    let debtCount = 0;
+    if (data.debts) {
+      for (const d of data.debts) {
+        if (!d.person || !d.amount) continue;
+        await addDoc(debtsCol, {
+          person: d.person, direction: d.direction === "i_owe" ? "i_owe" : "owed_to_me",
+          amount: d.amount, note: d.note || "", dateISO: d.dateISO || todayISO(),
+          dueDate: d.dueDate || "", status: d.status === "settled" ? "settled" : "outstanding",
+          createdAt: serverTimestamp(),
+        });
+        debtCount++;
+      }
+    }
+
     // Import settings
     if (data.settings && data.settings.currencySymbol != null) {
       await setDoc(doc(settingsCol, "preferences"), { currencySymbol: data.settings.currencySymbol }, { merge: true });
     }
 
-    if (statusEl) statusEl.textContent = `✅ Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules.`;
+    if (statusEl) statusEl.textContent = `✅ Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules, ${debtCount} debts.`;
   } catch (err) {
     if (statusEl) statusEl.textContent = "❌ Import failed: " + (err.message || "Unknown error");
   }
@@ -3886,6 +4012,9 @@ function wireEvents() {
     }
     if (viewName === "recurring") {
       renderRecurringRules();
+    }
+    if (viewName === "debts") {
+      renderDebts();
     }
   }
 
@@ -4555,6 +4684,28 @@ function wireEvents() {
       const btn = e.target.closest("[data-action='delete-goal']");
       if (btn && btn.dataset.id) deleteSavingsGoal(btn.dataset.id);
     });
+  }
+
+  // ── Debts / Lending ──
+  const debtForm = document.getElementById("debtForm");
+  if (debtForm) {
+    debtForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      addDebt();
+    });
+  }
+  const debtsContainer = document.getElementById("debtsContainer");
+  if (debtsContainer) {
+    debtsContainer.addEventListener("click", (e) => {
+      const settleBtn = e.target.closest("[data-action='settle-debt']");
+      if (settleBtn && settleBtn.dataset.id) { settleDebt(settleBtn.dataset.id); return; }
+      const delBtn = e.target.closest("[data-action='delete-debt']");
+      if (delBtn && delBtn.dataset.id) deleteDebt(delBtn.dataset.id);
+    });
+  }
+  const debtShowSettled = document.getElementById("debtShowSettled");
+  if (debtShowSettled) {
+    debtShowSettled.addEventListener("change", renderDebts);
   }
 
   // ── Recurring Transactions ──

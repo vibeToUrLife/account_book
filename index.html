@@ -68,6 +68,10 @@
           <span class="sidebar-icon">🔁</span>
           <span>Recurring</span>
         </button>
+        <button class="sidebar-item" data-view="debts" type="button">
+          <span class="sidebar-icon">💳</span>
+          <span>Debts</span>
+        </button>
         <button class="sidebar-item" data-view="settings" type="button">
           <span class="sidebar-icon">⚙️</span>
           <span>Settings</span>
@@ -598,6 +602,60 @@
         </section>
 
         <!-- VIEW: Settings -->
+        <!-- VIEW: Debts -->
+        <section class="card stack view-section" data-view="debts" aria-label="Debts & Lending">
+          <div class="row">
+            <h2>💳 Debts & Lending</h2>
+            <div class="muted small">Track who owes you and what you owe.</div>
+          </div>
+          <form id="debtForm" class="stack-compact" autocomplete="off">
+            <div class="grid-2">
+              <label class="field inline-sm">
+                <span>Person</span>
+                <input id="debtPerson" type="text" placeholder="e.g., Ali" required maxlength="40" />
+              </label>
+              <label class="field inline-sm">
+                <span>Direction</span>
+                <select id="debtDirection" required>
+                  <option value="owed_to_me">They owe me</option>
+                  <option value="i_owe">I owe them</option>
+                </select>
+              </label>
+            </div>
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Amount</span>
+                <input id="debtAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Note</span>
+                <input id="debtNote" type="text" placeholder="optional" maxlength="60" />
+              </label>
+              <label class="field inline-sm">
+                <span>Due Date</span>
+                <input id="debtDueDate" type="date" />
+              </label>
+            </div>
+            <div class="row">
+              <button id="debtSubmitBtn" class="btn" type="submit">Add Debt</button>
+            </div>
+          </form>
+
+          <div class="divider-thin"></div>
+
+          <div id="debtSummary" class="debt-summary"></div>
+
+          <div class="row wrap" style="gap:8px">
+            <h3 style="margin:0">📋 Outstanding</h3>
+            <label class="muted small" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input id="debtShowSettled" type="checkbox" /> Show settled
+            </label>
+          </div>
+          <div id="debtsContainer" class="debts-list">
+            <div class="muted small">No debts recorded yet.</div>
+          </div>
+        </section>
+
         <section class="card stack view-section" data-view="settings" aria-label="Settings">
           <div class="row">
             <h2>⚙️ Settings</h2>
