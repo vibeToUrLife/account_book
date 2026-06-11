@@ -91,6 +91,14 @@ export function escapeHtml(s) {
 }
 
 /**
+ * Inline SVG icon markup referencing a #i-<name> sprite symbol in index.html.
+ * Use in template strings, e.g. `${icon("wallet")}` or `${icon("x", "icon-sm")}`.
+ */
+export function icon(name, cls = "") {
+  return `<svg class="icon${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+
+/**
  * Parse a comma-separated tag string into a clean, de-duplicated array.
  * Lowercases, trims, drops empties, caps at 8 tags of 20 chars each.
  */

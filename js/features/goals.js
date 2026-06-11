@@ -1,6 +1,6 @@
 // Savings Goals feature module.
 export function createGoals(ctx) {
-  const { money, escapeHtml, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
+  const { money, icon, escapeHtml, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, doc, serverTimestamp } = firestore;
 
   function renderSavingsGoals() {
@@ -26,7 +26,7 @@ export function createGoals(ctx) {
 
       return `<div class="goal-card">
         <div class="goal-card-header">
-          <h4>🎯 ${escapeHtml(g.name || "Untitled")}</h4>
+          <h4>${icon("target", "icon-sm")} ${escapeHtml(g.name || "Untitled")}</h4>
           <span class="goal-deadline">${deadline}</span>
         </div>
         <div class="goal-progress-bar">

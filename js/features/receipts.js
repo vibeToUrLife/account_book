@@ -2,7 +2,7 @@
 // state internally. Photos live in a per-transaction `receipts` subcollection;
 // the transaction carries only a tiny `receiptCount`.
 export function createReceipts(ctx) {
-  const { userCollections, firestore } = ctx;
+  const { icon, userCollections, firestore } = ctx;
   const { collection, doc, addDoc, getDocs, deleteDoc, setDoc, serverTimestamp, query, orderBy } = firestore;
 
   let pendingReceipts = [];   // dataURLs queued on the Add Record form
@@ -68,7 +68,7 @@ export function createReceipts(ctx) {
     strip.innerHTML = pendingReceipts.map((url, i) =>
       `<div class="receipt-thumb">
         <img src="${url}" alt="Pending photo ${i + 1}" data-action="view-pending" data-idx="${i}" />
-        <button type="button" class="receipt-thumb-remove" data-action="remove-pending" data-idx="${i}" title="Remove">✕</button>
+        <button type="button" class="receipt-thumb-remove" data-action="remove-pending" data-idx="${i}" title="Remove" aria-label="Remove">${icon("x", "icon-sm")}</button>
       </div>`
     ).join("");
   }
@@ -136,7 +136,7 @@ export function createReceipts(ctx) {
     grid.innerHTML = docs.map((r) =>
       `<div class="receipt-thumb">
         <img src="${r.dataUrl}" alt="Photo" data-action="view-receipt" />
-        <button type="button" class="receipt-thumb-remove" data-action="delete-receipt" data-id="${r.id}" title="Delete">✕</button>
+        <button type="button" class="receipt-thumb-remove" data-action="delete-receipt" data-id="${r.id}" title="Delete" aria-label="Delete">${icon("x", "icon-sm")}</button>
       </div>`
     ).join("");
   }

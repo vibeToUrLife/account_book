@@ -117,7 +117,7 @@ export function createRecurring(ctx) {
 
     const count = await addDueRules(due, dateISO);
     if (count > 0) {
-      showUndoToast({ message: `🔁 Auto-added ${count} recurring transaction(s).`, onUndo: () => {} });
+      showUndoToast({ message: `Auto-added ${count} recurring transaction(s).`, onUndo: () => {} });
     }
   }
 
@@ -130,7 +130,7 @@ export function createRecurring(ctx) {
       return;
     }
     const count = await addDueRules(due, dateISO);
-    setAppError(count > 0 ? `✅ Added ${count} recurring transaction(s).` : "All due recurring transactions already recorded today.");
+    setAppError(count > 0 ? `Added ${count} recurring transaction(s).` : "All due recurring transactions already recorded today.");
   }
 
   return {

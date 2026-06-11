@@ -23,7 +23,8 @@ import {
   clamp,
   escapeHtml,
   parseTags,
-} from "./utils.js?v=5";
+  icon,
+} from "./utils.js?v=6";
 
 import { createDebts } from "./js/features/debts.js";
 import { createSubscriptions } from "./js/features/subscriptions.js";
@@ -300,7 +301,7 @@ function applyTheme(theme) {
   const isDark = normalized === "dark";
   if (els.themeToggleBtn) {
     els.themeToggleBtn.setAttribute("aria-pressed", String(isDark));
-    els.themeToggleBtn.textContent = isDark ? "☀️" : "🌙";
+    els.themeToggleBtn.innerHTML = isDark ? icon("sun") : icon("moon");
     els.themeToggleBtn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
   }
 
@@ -703,6 +704,7 @@ const ctx = {
   get currencySymbol() { return currencySymbol; },
   els,
   money,
+  icon,
   escapeHtml,
   todayISO,
   normalizeText,
@@ -1181,7 +1183,7 @@ function renderTransactionsTable() {
       <td data-label="Note">${escapeHtml(tx.note || "")}${tagsHtml}</td>
       <td>
         <div class="row-actions">
-          <button class="btn btn-secondary btn-small" type="button" data-action="receipts-tx" data-id="${tx.id}" title="Photos">📎${tx.receiptCount ? " " + tx.receiptCount : ""}</button>
+          <button class="btn btn-secondary btn-small" type="button" data-action="receipts-tx" data-id="${tx.id}" title="Photos" aria-label="Photos">${icon("paperclip", "icon-sm")}${tx.receiptCount ? " " + tx.receiptCount : ""}</button>
           <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${tx.id}">Edit</button>
           <button class="btn btn-danger btn-small" type="button" data-action="delete-tx" data-id="${tx.id}">Delete</button>
         </div>
@@ -2401,7 +2403,7 @@ async function executeAssistantIntent(parsed) {
     return {
       ok: true,
       type: "query",
-      message: `📊 ${label} for ${result.monthLabel}`,
+      message: `${label} for ${result.monthLabel}`,
       expense: result.totalExpense,
       revenue: result.totalRevenue,
       net: result.net,
@@ -2444,7 +2446,7 @@ async function executeAssistantIntent(parsed) {
     return {
       ok: true,
       type: "add",
-      message: `✅ ${typeLabel} recorded!`,
+      message: `${typeLabel} recorded!`,
       detail: `${categoryName} · ${money(parsed.amount)} · ${dateISO}${note ? " · " + note : ""}`,
     };
   }
@@ -2473,7 +2475,7 @@ function addThinking() {
 }
 
 function formatQueryResult(result) {
-  let html = `<span>${escapeHtml(result.message)}</span>`;
+  let html = `<span>${icon("chart", "icon-sm")} ${escapeHtml(result.message)}</span>`;
   html += `<span class="chat-amount">${money(result.expense)} expense</span>`;
   if (result.revenue > 0) {
     html += `<span class="chat-detail">Revenue: ${money(result.revenue)} · Net: ${money(result.net)}</span>`;
@@ -2483,13 +2485,13 @@ function formatQueryResult(result) {
 }
 
 function formatAddResult(result) {
-  let html = `<span class="chat-success">${escapeHtml(result.message)}</span>`;
+  let html = `<span class="chat-success">${icon("check", "icon-sm")} ${escapeHtml(result.message)}</span>`;
   html += `<span class="chat-detail">${escapeHtml(result.detail)}</span>`;
   return html;
 }
 
 function formatBatchAddResult(results, errors) {
-  let html = `<span class="chat-success">✅ ${results.length} transaction(s) recorded!</span>`;
+  let html = `<span class="chat-success">${icon("check", "icon-sm")} ${results.length} transaction(s) recorded!</span>`;
   
   // Show each transaction
   for (const r of results) {
@@ -2498,7 +2500,7 @@ function formatBatchAddResult(results, errors) {
   
   // Show any errors
   if (errors && errors.length > 0) {
-    html += `<span class="chat-detail" style="color:#f59e0b;">⚠️ ${errors.length} failed: ${escapeHtml(errors[0])}</span>`;
+    html += `<span class="chat-detail" style="color:var(--warning);">${icon("warn", "icon-sm")} ${errors.length} failed: ${escapeHtml(errors[0])}</span>`;
   }
   
   return html;
@@ -2550,7 +2552,7 @@ async function handleAssistantMessage(text) {
       if (thinking) thinking.remove();
 
       if (results.length === 0 && errors.length > 0) {
-        addChatBubble("bot", `<span>❌ ${escapeHtml(errors[0])}</span>`);
+        addChatBubble("bot", `<span>${icon("x-circle", "icon-sm")} ${escapeHtml(errors[0])}</span>`);
         return;
       }
 
@@ -2580,7 +2582,7 @@ async function handleAssistantMessage(text) {
     }
   } catch (err) {
     if (thinking) thinking.remove();
-    addChatBubble("bot", `<span>❌ Error: ${escapeHtml(friendlyDbError(err))}</span>`);
+    addChatBubble("bot", `<span>${icon("x-circle", "icon-sm")} Error: ${escapeHtml(friendlyDbError(err))}</span>`);
   }
 }
 
@@ -2608,9 +2610,9 @@ function initSpeechRecognition() {
   rec.onerror = (event) => {
     stopListening();
     if (event.error === "no-speech") {
-      addChatBubble("bot", "<span>🎤 No speech detected. Please try again.</span>");
+      addChatBubble("bot", `<span>${icon("mic", "icon-sm")} No speech detected. Please try again.</span>`);
     } else if (event.error === "not-allowed") {
-      addChatBubble("bot", "<span>🎤 Microphone access denied. Please allow mic permission.</span>");
+      addChatBubble("bot", `<span>${icon("mic", "icon-sm")} Microphone access denied. Please allow mic permission.</span>`);
     }
   };
 
@@ -2626,7 +2628,7 @@ function startListening() {
     speechRecognition = initSpeechRecognition();
   }
   if (!speechRecognition) {
-    addChatBubble("bot", "<span>🎤 Speech recognition not supported in this browser. Use Chrome for best results.</span>");
+    addChatBubble("bot", `<span>${icon("mic", "icon-sm")} Speech recognition not supported in this browser. Use Chrome for best results.</span>`);
     return;
   }
   try {
@@ -2805,7 +2807,7 @@ function updateAutoCategorySuggestion() {
     return;
   }
 
-  els.autoCategorySuggestion.textContent = `💡 Suggest: ${suggestion.name} (${Math.round(suggestion.confidence * 100)}% match — click to apply)`;
+  els.autoCategorySuggestion.innerHTML = `${icon("bulb", "icon-sm")} Suggest: ${escapeHtml(suggestion.name)} (${Math.round(suggestion.confidence * 100)}% match — click to apply)`;
   els.autoCategorySuggestion.hidden = false;
   els.autoCategorySuggestion.onclick = () => {
     els.txCategory.value = suggestion.id;
@@ -2854,16 +2856,19 @@ function generateInsights() {
   const monthName = now.toLocaleDateString(undefined, { month: "long" });
 
   // 1. Friendly headline
-  let heroSub;
+  let heroSub, heroIcon;
   if (curExpense === 0 && curRevenue === 0) {
-    heroSub = "Nothing logged this month yet — add a record to get started! ✏️";
+    heroSub = "Nothing logged this month yet — add a record to get started!";
+    heroIcon = "edit";
   } else if (netCur >= 0) {
-    heroSub = `You're up <b class="insight-good">${money(netCur)}</b> so far — nice going! 🎉`;
+    heroSub = `You're up <b class="insight-good">${money(netCur)}</b> so far — nice going!`;
+    heroIcon = "up";
   } else {
-    heroSub = `You've spent <b class="insight-warn">${money(-netCur)}</b> more than you earned this month. 👀`;
+    heroSub = `You've spent <b class="insight-warn">${money(-netCur)}</b> more than you earned this month.`;
+    heroIcon = "down";
   }
   cards.push(`<div class="insight-hero">
-    <div class="insight-hero-emoji">👋</div>
+    <div class="insight-hero-emoji">${icon(heroIcon)}</div>
     <div>
       <div class="insight-hero-title">Your ${escapeHtml(monthName)} so far</div>
       <div class="insight-hero-sub">${heroSub}</div>
@@ -2878,13 +2883,13 @@ function generateInsights() {
 
   // 2. Overview tiles
   const projLine = (dayOfMonth < daysInMonth && curExpense > 0)
-    ? `<div class="insight-line muted small">📈 On track to spend about <b>${money(projected)}</b> by month-end (≈ ${money(dailyAvg)}/day).</div>`
+    ? `<div class="insight-line muted small">${icon("up", "icon-sm")} On track to spend about <b>${money(projected)}</b> by month-end (≈ ${money(dailyAvg)}/day).</div>`
     : "";
   cards.push(`<div class="insight-card">
     <div class="insight-tiles">
-      <div class="insight-tile"><span class="insight-tile-label">💸 Spent</span><span class="insight-tile-value insight-warn">${money(curExpense)}</span></div>
-      <div class="insight-tile"><span class="insight-tile-label">💵 Earned</span><span class="insight-tile-value insight-good">${money(curRevenue)}</span></div>
-      <div class="insight-tile"><span class="insight-tile-label">💎 Net</span><span class="insight-tile-value ${netCur >= 0 ? 'insight-good' : 'insight-warn'}">${money(netCur)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">${icon("down", "icon-sm")} Spent</span><span class="insight-tile-value insight-warn">${money(curExpense)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">${icon("up", "icon-sm")} Earned</span><span class="insight-tile-value insight-good">${money(curRevenue)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">${icon("gem", "icon-sm")} Net</span><span class="insight-tile-value ${netCur >= 0 ? 'insight-good' : 'insight-warn'}">${money(netCur)}</span></div>
     </div>
     ${projLine}
   </div>`);
@@ -2902,7 +2907,7 @@ function generateInsights() {
     const expChange = prevExpense > 0 ? ((curExpense - prevExpense) / prevExpense * 100) : 0;
     const revChange = prevRevenue > 0 ? ((curRevenue - prevRevenue) / prevRevenue * 100) : 0;
     cards.push(`<div class="insight-card">
-      <h4>📈 Compared to last month</h4>
+      <h4>${icon("up", "icon-sm")} Compared to last month</h4>
       <div class="insight-chips">
         ${chip("spending", expChange, true)}
         ${chip("income", revChange, false)}
@@ -2923,7 +2928,7 @@ function generateInsights() {
       </div>`;
     }).join("");
     cards.push(`<div class="insight-card">
-      <h4>🏆 Where your money went</h4>
+      <h4>${icon("trophy", "icon-sm")} Where your money went</h4>
       <div class="insight-bars">${bars}</div>
     </div>`);
   }
@@ -2940,14 +2945,14 @@ function generateInsights() {
   if (budgetAlerts.length > 0) {
     const rows = budgetAlerts.map((a) => {
       const over = a.pct > 100;
-      const badge = over ? `⚠️ Over by ${money(a.spent - a.budget)}` : a.pct >= 100 ? "✅ Fully used" : `⚡ ${a.pct.toFixed(0)}%`;
+      const badge = over ? `${icon("warn", "icon-sm")} Over by ${money(a.spent - a.budget)}` : a.pct >= 100 ? `${icon("check", "icon-sm")} Fully used` : `${icon("zap", "icon-sm")} ${a.pct.toFixed(0)}%`;
       return `<div class="insight-bar-row">
         <div class="insight-bar-head"><span>${escapeHtml(a.name)}</span><span class="${over ? 'insight-warn' : 'insight-highlight'}">${badge}</span></div>
         <div class="insight-bar-track"><div class="insight-bar-fill ${over ? 'over' : ''}" style="width:${Math.min(100, a.pct)}%"></div></div>
       </div>`;
     }).join("");
     cards.push(`<div class="insight-card">
-      <h4>🚨 Budgets to watch</h4>
+      <h4>${icon("warn", "icon-sm")} Budgets to watch</h4>
       <div class="insight-bars">${rows}</div>
     </div>`);
   }
@@ -2967,7 +2972,7 @@ function generateInsights() {
     const weAvg = weekend.total / weekend.count;
     const moreWeekend = weAvg > wdAvg;
     cards.push(`<div class="insight-card">
-      <h4>🗓️ Your habit</h4>
+      <h4>${icon("calendar", "icon-sm")} Your habit</h4>
       <div class="insight-line">You spend more on <strong>${moreWeekend ? "weekends" : "weekdays"}</strong> — about <b class="insight-highlight">${money(moreWeekend ? weAvg : wdAvg)}</b> per transaction vs ${money(moreWeekend ? wdAvg : weAvg)}.</div>
     </div>`);
   }
@@ -3214,8 +3219,8 @@ function renderDashboard() {
 
       if (pct >= 80) {
         const label = pct > 100
-          ? `⛔ Over by ${money(spent - cat.budget)}`
-          : pct >= 100 ? "✅ Fully used" : `⚡ ${Math.round(pct)}% used`;
+          ? `${icon("warn", "icon-sm")} Over by ${money(spent - cat.budget)}`
+          : pct >= 100 ? `${icon("check", "icon-sm")} Fully used` : `${icon("zap", "icon-sm")} ${Math.round(pct)}% used`;
         alerts.push(`<div class="dash-alert-item">${escapeHtml(cat.name)}: ${money(spent)} / ${money(cat.budget)} — ${label}</div>`);
 
         // Browser notification (deduped per category + month + threshold)
@@ -3235,14 +3240,14 @@ function renderDashboard() {
           const crossDay = Math.ceil(cat.budget / dailyRate);
           const dayText = crossDay <= daysInMonth ? `around day ${crossDay}` : "after month-end";
           forecasts.push(
-            `<div class="dash-alert-item dash-forecast-item">🔮 ${escapeHtml(cat.name)}: at this rate you'll spend ~${money(projected)} (budget ${money(cat.budget)}) — likely exceed ${dayText}.</div>`
+            `<div class="dash-alert-item dash-forecast-item">${icon("activity", "icon-sm")} ${escapeHtml(cat.name)}: at this rate you'll spend ~${money(projected)} (budget ${money(cat.budget)}) — likely exceed ${dayText}.</div>`
           );
         }
       }
     }
 
     const html = [...alerts, ...forecasts];
-    dashAlerts.innerHTML = html.length > 0 ? html.join("") : '<div class="muted small">All budgets are on track. 👍</div>';
+    dashAlerts.innerHTML = html.length > 0 ? html.join("") : `<div class="muted small">${icon("check", "icon-sm")} All budgets are on track.</div>`;
   }
 
   renderHeatmapCalendar();
@@ -3521,7 +3526,7 @@ function openDayDetail(dateISO) {
     else income += t.amount;
   }
 
-  if (title) title.textContent = `📅 ${dateISO}`;
+  if (title) title.innerHTML = `${icon("calendar")} ${escapeHtml(dateISO)}`;
   if (summary) {
     summary.innerHTML = `
       <span class="day-detail-stat"><span class="muted small">Expense</span><b class="mom-delta expense">${money(expense)}</b></span>
@@ -3644,7 +3649,7 @@ async function importDataFromJson(file) {
     const data = JSON.parse(text);
 
     if (!data.categories || !data.transactions) {
-      if (statusEl) statusEl.textContent = "❌ Invalid backup file format.";
+      if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} Invalid backup file format.`;
       return;
     }
 
@@ -3733,9 +3738,9 @@ async function importDataFromJson(file) {
       await setDoc(doc(settingsCol, "preferences"), { currencySymbol: data.settings.currencySymbol }, { merge: true });
     }
 
-    if (statusEl) statusEl.textContent = `✅ Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules, ${debtCount} debts, ${subCount} subscriptions.`;
+    if (statusEl) statusEl.innerHTML = `${icon("check", "icon-sm")} Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules, ${debtCount} debts, ${subCount} subscriptions.`;
   } catch (err) {
-    if (statusEl) statusEl.textContent = "❌ Import failed: " + (err.message || "Unknown error");
+    if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} Import failed: ${escapeHtml(err.message || "Unknown error")}`;
   }
 }
 

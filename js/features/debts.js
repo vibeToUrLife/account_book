@@ -3,7 +3,7 @@
 // from the core (app.js). Reads current state via ctx.* getters; writes go through
 // Firestore, and the core's onSnapshot listeners refresh state + re-render.
 export function createDebts(ctx) {
-  const { money, escapeHtml, todayISO, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
+  const { money, icon, escapeHtml, todayISO, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
   const { addDoc, setDoc, deleteDoc, doc, serverTimestamp } = firestore;
 
   function renderDebts() {
@@ -50,7 +50,7 @@ export function createDebts(ctx) {
         </div>
         <div class="debt-actions">
           ${settled
-            ? `<span class="debt-settled-tag">✅ Settled</span>`
+            ? `<span class="debt-settled-tag">${icon("check", "icon-sm")} Settled</span>`
             : `<button class="btn btn-secondary btn-small" type="button" data-action="settle-debt" data-id="${d.id}">Mark paid</button>`}
           <button class="btn btn-danger btn-small" type="button" data-action="delete-debt" data-id="${d.id}">Delete</button>
         </div>
