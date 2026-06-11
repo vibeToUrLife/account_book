@@ -2844,55 +2844,112 @@ input:focus, select:focus {
 }
 
 /* ======================================================================
-   ☢ DESIGN OVERHAUL v6 — "CYBER HUD" (fintech x sci-fi console)
-   Last layer — wins the cascade. Forces a dark cockpit theme regardless
-   of light/dark toggle, with neon glow, monospace readouts & grid texture.
+   ✦ DESIGN SYSTEM — "MIDNIGHT VAULT" (premium fintech dark)
+   Last layer — wins the cascade. A calm, confident banking-app skin:
+   ink-navy panels, an emerald + gold duotone, and tabular-mono money.
+   Accounting-true color: emerald = in, soft red = out. Gold is a rare
+   accent reserved for hero hairlines and focus. No neon, no grid noise.
    ====================================================================== */
 
+/* ---- Midnight Vault (dark) — the default / hero ---- */
 :root,
-:root[data-theme="dark"],
-:root[data-theme="light"] {
+:root[data-theme="dark"] {
   color-scheme: dark;
 
-  --hud-bg: #03060f;
-  --hud-bg2: #060b1c;
-  --hud-panel: rgba(10, 18, 38, 0.72);
-  --hud-panel-solid: #0a1226;
-  --hud-cyan: #2bf5ff;
-  --hud-magenta: #ff3df0;
-  --hud-lime: #8cff5a;
-  --hud-amber: #ffb648;
-  --hud-line: rgba(43, 245, 255, 0.22);
-  --hud-line-strong: rgba(43, 245, 255, 0.5);
+  --vault-bg: #0b1220;
+  --vault-bg2: #070d18;
+  --vault-panel: #131c2e;
+  --vault-panel-2: #18233a;
+  --vault-emerald: #34d399;
+  --vault-emerald-strong: #6ee7b7;   /* emerald used as TEXT (light on dark) */
+  --vault-gold: #e8b04b;
+  --vault-gold-strong: #f4cd84;
+  --vault-red: #fb7185;
+  --vault-line: rgba(199, 210, 235, 0.10);
+  --vault-line-strong: rgba(199, 210, 235, 0.20);
+  --vault-ink: #eef2fa;              /* headings / strong text */
+  --nav-text: rgba(199, 210, 235, 0.66);
 
-  --bg: var(--hud-bg);
-  --card: var(--hud-panel);
-  --card-solid: var(--hud-panel-solid);
-  --text: #d6f6ff;
-  --muted: rgba(140, 200, 230, 0.62);
-  --border: var(--hud-line);
-  --glass-border: var(--hud-line);
-  --glass-highlight: rgba(43, 245, 255, 0.18);
-  --primary: var(--hud-cyan);
-  --primary-strong: #7bfcff;
-  --primary-light: rgba(43, 245, 255, 0.10);
-  --danger: #ff4d6d;
-  --success: var(--hud-lime);
-  --warning: var(--hud-amber);
-  --input-bg: rgba(43, 245, 255, 0.05);
-  --placeholder: rgba(140, 200, 230, 0.4);
-  --focus-border: var(--hud-cyan);
-  --focus-ring: rgba(43, 245, 255, 0.22);
-  --row-hover: rgba(43, 245, 255, 0.07);
-  --stat-bg: rgba(43, 245, 255, 0.04);
-  --header-bg: rgba(3, 6, 15, 0.6);
-  --btn-secondary-bg: rgba(43, 245, 255, 0.06);
-  --selection-bg: rgba(43, 245, 255, 0.3);
+  --app-bg:
+    radial-gradient(55vmax 55vmax at 8% -4%, rgba(52, 211, 153, 0.08), transparent 60%),
+    radial-gradient(60vmax 60vmax at 100% 8%, rgba(232, 176, 75, 0.05), transparent 60%),
+    radial-gradient(70vmax 60vmax at 60% 110%, rgba(11, 18, 32, 0.9), transparent 62%),
+    var(--vault-bg);
+  --header-grad: linear-gradient(180deg, rgba(11, 18, 32, 0.86), rgba(11, 18, 32, 0.6));
+  --sidebar-grad: linear-gradient(180deg, #0d1525, #090f1c);
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 12px 32px rgba(0, 0, 0, 0.32);
+  --card-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 16px 40px rgba(0, 0, 0, 0.4);
+
+  --bg: var(--vault-bg);
+  --card: var(--vault-panel);
+  --card-solid: var(--vault-panel);
+  --text: #e3e9f4;
+  --muted: rgba(199, 210, 235, 0.55);
+  --border: var(--vault-line);
+  --glass-border: var(--vault-line);
+  --glass-highlight: rgba(199, 210, 235, 0.06);
+  --primary: var(--vault-emerald);
+  --primary-strong: var(--vault-emerald-strong);
+  --primary-light: rgba(52, 211, 153, 0.12);
+  --danger: var(--vault-red);
+  --success: var(--vault-emerald);
+  --warning: var(--vault-gold);
+  --input-bg: rgba(199, 210, 235, 0.04);
+  --placeholder: rgba(199, 210, 235, 0.38);
+  --focus-border: var(--vault-emerald);
+  --focus-ring: rgba(52, 211, 153, 0.22);
+  --row-hover: rgba(199, 210, 235, 0.05);
+  --stat-bg: rgba(199, 210, 235, 0.03);
+  --header-bg: rgba(11, 18, 32, 0.72);
+  --btn-secondary-bg: rgba(199, 210, 235, 0.05);
+  --selection-bg: rgba(52, 211, 153, 0.26);
 }
 
-/* ---- Cockpit background: deep space + neon grid + scanlines ---- */
+/* ---- Daylight Vault (light) — calm cool-white companion ---- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --vault-bg: #eef1f7;
+  --vault-bg2: #e5e9f1;
+  --vault-panel: #ffffff;
+  --vault-panel-2: #f3f5fa;
+  --vault-emerald: #10b981;
+  --vault-emerald-strong: #0a7d56;   /* darker emerald for readable TEXT on white */
+  --vault-gold: #c8902a;
+  --vault-gold-strong: #a9761c;
+  --vault-red: #e23d5c;
+  --vault-line: rgba(30, 41, 64, 0.10);
+  --vault-line-strong: rgba(30, 41, 64, 0.16);
+  --vault-ink: #0f1826;
+  --nav-text: rgba(40, 52, 74, 0.66);
+
+  --app-bg:
+    radial-gradient(55vmax 55vmax at 8% -4%, rgba(16, 185, 129, 0.07), transparent 60%),
+    radial-gradient(60vmax 60vmax at 100% 8%, rgba(200, 144, 42, 0.06), transparent 60%),
+    radial-gradient(70vmax 60vmax at 60% 110%, rgba(229, 233, 241, 0.9), transparent 62%),
+    var(--vault-bg);
+  --header-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.64));
+  --sidebar-grad: linear-gradient(180deg, #ffffff, #f4f6fb);
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 10px 28px rgba(30, 41, 64, 0.08);
+  --card-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 14px 34px rgba(30, 41, 64, 0.12);
+
+  --text: #1f2733;
+  --muted: rgba(40, 52, 74, 0.60);
+  --glass-highlight: rgba(30, 41, 64, 0.04);
+  --primary-light: rgba(16, 185, 129, 0.12);
+  --focus-ring: rgba(16, 185, 129, 0.22);
+  --input-bg: rgba(30, 41, 64, 0.03);
+  --placeholder: rgba(40, 52, 74, 0.42);
+  --row-hover: rgba(30, 41, 64, 0.04);
+  --stat-bg: rgba(30, 41, 64, 0.025);
+  --header-bg: rgba(255, 255, 255, 0.72);
+  --btn-secondary-bg: rgba(30, 41, 64, 0.04);
+  --selection-bg: rgba(16, 185, 129, 0.20);
+}
+
+/* ---- Vault atmosphere: soft, static glows over the base surface ---- */
 body {
-  background: var(--hud-bg);
+  background: var(--vault-bg);
   font-family: 'Inter', system-ui, sans-serif;
 }
 
@@ -2902,198 +2959,129 @@ body::before {
   inset: 0;
   z-index: -2;
   pointer-events: none;
-  background:
-    radial-gradient(60vmax 60vmax at 12% 6%, rgba(43, 245, 255, 0.16), transparent 60%),
-    radial-gradient(55vmax 55vmax at 90% 12%, rgba(255, 61, 240, 0.14), transparent 60%),
-    radial-gradient(70vmax 70vmax at 70% 100%, rgba(43, 245, 255, 0.10), transparent 62%),
-    var(--hud-bg);
-  filter: none;
-  opacity: 1;
-  animation: none;
+  background: var(--app-bg);
 }
 
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--hud-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--hud-line) 1px, transparent 1px);
-  background-size: 44px 44px;
-  -webkit-mask-image: radial-gradient(120vmax 80vmax at 50% 0%, #000 30%, transparent 80%);
-  mask-image: radial-gradient(120vmax 80vmax at 50% 0%, #000 30%, transparent 80%);
-  opacity: 0.5;
-  animation: hudGridPan 30s linear infinite;
-}
+/* No grid / scanline overlay in the Vault theme. */
+body::after { content: none; display: none; }
 
-@keyframes hudGridPan {
-  from { background-position: 0 0, 0 0; }
-  to   { background-position: 44px 44px, 44px 44px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body::after { animation: none; }
-}
-
-/* ---- Header: cockpit bar with scan glow ---- */
+/* ---- Header: quiet navy bar with a hairline base ---- */
 .app-header {
-  background: linear-gradient(180deg, rgba(3, 6, 15, 0.9), rgba(3, 6, 15, 0.5)) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border-bottom: 1px solid var(--hud-line-strong) !important;
-  box-shadow: 0 0 28px rgba(43, 245, 255, 0.18);
+  background: var(--header-grad) !important;
+  backdrop-filter: blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+  border-bottom: 1px solid var(--vault-line) !important;
+  box-shadow: none;
 }
 
 .app-header h1 {
-  font-family: 'Orbitron', sans-serif !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
   font-size: 19px !important;
   font-weight: 800 !important;
-  letter-spacing: 0.18em !important;
-  text-transform: uppercase;
+  letter-spacing: -0.02em !important;
+  text-transform: none;
   background: none !important;
   -webkit-text-fill-color: currentColor !important;
-  color: var(--hud-cyan) !important;
-  text-shadow: 0 0 12px rgba(43, 245, 255, 0.7);
+  color: var(--vault-ink) !important;
+  text-shadow: none;
 }
 
-#authStatus { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em; }
+#authStatus { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em; }
 
-/* ---- Sidebar: HUD nav rail ---- */
+/* ---- Sidebar: solid ink-navy rail ---- */
 .sidebar {
-  background: linear-gradient(180deg, rgba(6, 11, 28, 0.96), rgba(3, 6, 15, 0.96)) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border-right: 1px solid var(--hud-line-strong) !important;
-  box-shadow: 0 0 50px rgba(43, 245, 255, 0.12) inset, 14px 0 40px rgba(0, 0, 0, 0.6) !important;
+  background: var(--sidebar-grad) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-right: 1px solid var(--vault-line) !important;
+  box-shadow: 1px 0 0 var(--vault-line), 18px 0 50px rgba(15, 23, 42, 0.18) !important;
 }
 
-.sidebar::after {
-  background:
-    linear-gradient(var(--hud-line) 1px, transparent 1px) 0 0 / 100% 40px,
-    radial-gradient(120% 50% at 50% -10%, rgba(43, 245, 255, 0.18), transparent 60%) !important;
-  mix-blend-mode: normal !important;
-  opacity: 0.5;
-}
+.sidebar::after { content: none !important; display: none !important; }
 
-.sidebar-header { border-bottom: 1px solid var(--hud-line-strong) !important; }
+.sidebar-header { border-bottom: 1px solid var(--vault-line) !important; }
 
 .sidebar-header h2 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 14px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--hud-cyan);
-  text-shadow: 0 0 10px rgba(43, 245, 255, 0.6);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--vault-ink);
+  text-shadow: none;
 }
 
 .sidebar-item {
-  color: rgba(190, 230, 245, 0.7) !important;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px !important;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  color: var(--nav-text) !important;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px !important;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
   border: 1px solid transparent;
-  border-radius: 8px !important;
+  border-radius: 12px !important;
   background: transparent !important;
 }
 
 .sidebar-item:hover {
-  color: var(--hud-cyan) !important;
-  background: rgba(43, 245, 255, 0.06) !important;
-  border-color: var(--hud-line);
+  color: var(--vault-ink) !important;
+  background: var(--row-hover) !important;
+  border-color: transparent;
 }
 
-.sidebar-item.active {
-  background: rgba(43, 245, 255, 0.12) !important;
-  color: var(--hud-cyan) !important;
-  border-color: var(--hud-line-strong) !important;
-  box-shadow: 0 0 22px rgba(43, 245, 255, 0.35), inset 0 0 14px rgba(43, 245, 255, 0.18) !important;
-  text-shadow: 0 0 8px rgba(43, 245, 255, 0.7);
-}
-
-.sidebar-item.active::before {
-  background: var(--hud-cyan) !important;
-  box-shadow: 0 0 14px var(--hud-cyan) !important;
-}
-
-/* Beat the v4 theme-scoped active rules (higher specificity) */
+.sidebar-item.active,
 :root[data-theme="dark"] .sidebar-item.active,
 :root[data-theme="light"] .sidebar-item.active,
 :root .sidebar-item.active {
-  background: rgba(43, 245, 255, 0.12) !important;
-  color: var(--hud-cyan) !important;
-  border: 1px solid var(--hud-line-strong) !important;
-  box-shadow: 0 0 22px rgba(43, 245, 255, 0.35), inset 0 0 14px rgba(43, 245, 255, 0.18) !important;
-  text-shadow: 0 0 8px rgba(43, 245, 255, 0.7);
+  background: rgba(52, 211, 153, 0.12) !important;
+  color: var(--vault-emerald-strong) !important;
+  border: 1px solid rgba(52, 211, 153, 0.28) !important;
+  box-shadow: none !important;
+  text-shadow: none;
 }
 
-/* ---- Cards: HUD panels with corner brackets + tracing top border ---- */
+.sidebar-item.active::before {
+  background: var(--vault-emerald) !important;
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.6) !important;
+}
+
+/* ---- Cards: clean ink-navy panels with a hairline edge ---- */
 .card {
-  background: var(--hud-panel) !important;
-  border: 1px solid var(--hud-line) !important;
-  border-radius: 6px !important;
-  box-shadow: 0 0 0 1px rgba(43, 245, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.5) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
+  background: var(--vault-panel) !important;
+  border: 1px solid var(--vault-line) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--card-shadow) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
-.card::before {
-  inset: 0 !important;
-  padding: 0 !important;
-  border-radius: inherit !important;
-  background:
-    linear-gradient(90deg, transparent, var(--hud-cyan), transparent) top/200% 1px no-repeat !important;
-  -webkit-mask: none !important;
-  mask: none !important;
-  opacity: 0.9 !important;
-  animation: hudTrace 4s linear infinite;
+/* No tracing border, no corner brackets in the Vault theme. */
+.card::before { content: none !important; display: none !important; }
+.card::after { content: none !important; display: none !important; }
+
+.card:hover {
+  transform: none !important;
+  border-color: var(--vault-line-strong) !important;
+  box-shadow: var(--card-shadow-hover) !important;
 }
 
-@keyframes hudTrace {
-  0% { background-position: -100% 0; }
-  100% { background-position: 100% 0; }
-}
-
-/* Corner brackets via after */
-.card::after {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border-radius: 4px;
-  pointer-events: none;
-  background:
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left top / 14px 2px no-repeat,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left top / 2px 14px no-repeat,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right top / 14px 2px no-repeat,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right top / 2px 14px no-repeat,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left bottom / 14px 2px no-repeat,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) left bottom / 2px 14px no-repeat,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right bottom / 14px 2px no-repeat,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) right bottom / 2px 14px no-repeat;
-  opacity: 0.35;
-}
-
-.card:hover { transform: none !important; box-shadow: 0 0 0 1px var(--hud-line-strong), 0 18px 44px rgba(0, 0, 0, 0.6), 0 0 30px rgba(43, 245, 255, 0.2) !important; }
-.card:hover::after { opacity: 0.7; }
-
-/* ---- Headings: Orbitron with accent ---- */
+/* ---- Headings: Inter, heavy, with an emerald accent rule ---- */
 .card > .row > h2,
 .card > h2,
 .dash-section h3 {
-  font-family: 'Orbitron', sans-serif;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 14px;
-  color: #eafcff;
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--vault-ink);
 }
 
 .card > .row > h2::before,
 .card > h2::before,
 .dash-section h3::before {
-  background: var(--hud-cyan) !important;
-  box-shadow: 0 0 12px var(--hud-cyan);
+  background: var(--vault-emerald) !important;
+  box-shadow: none;
 }
 
 /* ---- Money / numbers / data: monospace glow ---- */
@@ -3109,124 +3097,134 @@ td.right,
   letter-spacing: 0.02em;
 }
 
-/* ---- Buttons: angular neon ---- */
+/* ---- Buttons: emerald "money" primary, quiet secondary ---- */
 .btn {
-  border-radius: 6px !important;
-  font-family: 'JetBrains Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  border-radius: 12px !important;
+  font-family: 'Inter', system-ui, sans-serif;
+  text-transform: none;
+  letter-spacing: -0.01em;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .btn:not(.btn-secondary):not(.btn-danger) {
-  background: linear-gradient(135deg, rgba(43, 245, 255, 0.18), rgba(255, 61, 240, 0.16)) !important;
-  border: 1px solid var(--hud-line-strong) !important;
-  color: var(--hud-cyan) !important;
-  text-shadow: 0 0 8px rgba(43, 245, 255, 0.6);
-  box-shadow: 0 0 18px rgba(43, 245, 255, 0.25), inset 0 0 12px rgba(43, 245, 255, 0.1) !important;
+  background: linear-gradient(135deg, var(--vault-emerald), #2bbd8a) !important;
+  border: 1px solid rgba(52, 211, 153, 0.55) !important;
+  color: #07120c !important;
+  text-shadow: none;
+  box-shadow: 0 6px 18px rgba(52, 211, 153, 0.22) !important;
 }
 
 .btn:not(.btn-secondary):not(.btn-danger):hover {
-  box-shadow: 0 0 28px rgba(43, 245, 255, 0.5), inset 0 0 16px rgba(43, 245, 255, 0.2) !important;
-  color: #eafcff !important;
+  box-shadow: 0 10px 26px rgba(52, 211, 153, 0.34) !important;
+  color: #07120c !important;
 }
 
 .btn-secondary {
-  background: rgba(43, 245, 255, 0.05) !important;
-  border: 1px solid var(--hud-line) !important;
-  color: rgba(190, 230, 245, 0.85) !important;
-  border-radius: 6px !important;
+  background: var(--btn-secondary-bg) !important;
+  border: 1px solid var(--vault-line-strong) !important;
+  color: var(--text) !important;
+  border-radius: 12px !important;
 }
 
 .btn-secondary:hover {
-  border-color: var(--hud-line-strong) !important;
-  color: var(--hud-cyan) !important;
-  background: rgba(43, 245, 255, 0.1) !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  color: var(--vault-ink) !important;
+  background: var(--row-hover) !important;
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, rgba(255, 77, 109, 0.25), rgba(255, 61, 240, 0.18)) !important;
-  border: 1px solid rgba(255, 77, 109, 0.5) !important;
-  color: #ff8aa0 !important;
-  text-shadow: 0 0 8px rgba(255, 77, 109, 0.5);
+  background: linear-gradient(135deg, var(--vault-red), #e85d72) !important;
+  border: 1px solid rgba(251, 113, 133, 0.55) !important;
+  color: #1a0a0e !important;
+  text-shadow: none;
 }
 
-/* ---- Inputs: terminal fields ---- */
+/* ---- Inputs: dark fields with an emerald focus ---- */
 input, select {
-  border-radius: 6px !important;
-  background: rgba(43, 245, 255, 0.04) !important;
-  border: 1px solid var(--hud-line) !important;
-  color: #eafcff !important;
-  font-family: 'JetBrains Mono', monospace;
+  border-radius: 12px !important;
+  background: var(--input-bg) !important;
+  border: 1px solid var(--vault-line-strong) !important;
+  color: var(--vault-ink) !important;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 input:focus, select:focus {
-  border-color: var(--hud-cyan) !important;
-  box-shadow: 0 0 0 3px rgba(43, 245, 255, 0.18), 0 0 22px rgba(43, 245, 255, 0.3) !important;
+  border-color: var(--vault-emerald) !important;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18) !important;
 }
 
 .field span {
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--hud-cyan);
-  opacity: 0.75;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--muted);
+  opacity: 1;
 }
 
 /* ---- Tables ---- */
 .table-wrap, .chart-wrap {
-  border: 1px solid var(--hud-line) !important;
-  border-radius: 6px !important;
-  background: rgba(6, 11, 28, 0.5);
+  border: 1px solid var(--vault-line) !important;
+  border-radius: 14px !important;
+  background: rgba(7, 13, 24, 0.5);
 }
 
 .table thead th {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Inter', system-ui, sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--hud-cyan);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 700;
 }
 
-/* ---- Hero auth: HUD login console ---- */
+/* ---- Hero auth: a vault panel with a single gold hairline (signature) ---- */
 #authCard {
-  border-radius: 8px !important;
-  border: 1px solid var(--hud-line-strong) !important;
-  box-shadow: 0 0 0 1px rgba(43, 245, 255, 0.1), 0 0 60px rgba(43, 245, 255, 0.18), 0 24px 60px rgba(0, 0, 0, 0.6) !important;
+  position: relative;
+  border-radius: 18px !important;
+  border: 1px solid var(--vault-line-strong) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5) !important;
+  overflow: hidden;
+}
+
+#authCard::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--vault-gold), var(--vault-emerald), transparent);
+  opacity: 0.85;
 }
 
 #authCard h2 {
-  font-family: 'Orbitron', sans-serif !important;
-  font-size: 24px !important;
-  letter-spacing: 0.12em !important;
-  text-transform: uppercase;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 26px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.03em !important;
+  text-transform: none;
   background: none !important;
   -webkit-text-fill-color: currentColor !important;
-  color: var(--hud-cyan) !important;
-  text-shadow: 0 0 16px rgba(43, 245, 255, 0.6);
+  color: var(--vault-ink) !important;
+  text-shadow: none;
 }
 
-/* ---- Quick-Add FAB ---- */
+/* ---- Quick-Add FAB: emerald, calm ---- */
 .quick-add-fab {
-  background: linear-gradient(135deg, rgba(43, 245, 255, 0.3), rgba(255, 61, 240, 0.25)) !important;
-  border: 1px solid var(--hud-line-strong) !important;
-  color: var(--hud-cyan) !important;
-  box-shadow: 0 0 30px rgba(43, 245, 255, 0.5) !important;
-  text-shadow: 0 0 10px rgba(43, 245, 255, 0.8);
+  background: linear-gradient(135deg, var(--vault-emerald), #2bbd8a) !important;
+  border: 1px solid rgba(52, 211, 153, 0.5) !important;
+  color: #07120c !important;
+  box-shadow: 0 10px 28px rgba(52, 211, 153, 0.34) !important;
+  text-shadow: none;
+  animation: none !important;
 }
 
 /* ---- Menu button + toggles ---- */
 .menu-btn, #themeToggleBtn, #signOutBtn {
-  border-color: var(--hud-line) !important;
+  border-color: var(--vault-line-strong) !important;
 }
 
 /* Scrollbar */
-* { scrollbar-color: var(--hud-line-strong) transparent; }
+* { scrollbar-color: var(--vault-line-strong) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: rgba(43, 245, 255, 0.3); border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(43, 245, 255, 0.5); }
-
-@media (prefers-reduced-motion: reduce) {
-  .card::before { animation: none; }
-}
+::-webkit-scrollbar-thumb { background: rgba(199, 210, 235, 0.18); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(52, 211, 153, 0.4); }
 
 /* -- Global touch optimization -- */
 @media (pointer: coarse) {
@@ -3262,6 +3260,35 @@ input:focus, select:focus {
   }
 }
 
+/* ---- Vault cohesion: remap leftover gradient + signature numerals ---- */
+:root,
+:root[data-theme="dark"],
+:root[data-theme="light"] {
+  --btn-bg: linear-gradient(135deg, var(--vault-emerald), #2bbd8a);
+  --btn-text: #07120c;
+}
+
+/* Signature: headline money figures in an emerald→gold duotone, tabular mono */
+.stat-value,
+.stat-card .stat-value {
+  background: linear-gradient(120deg, var(--vault-emerald-strong), var(--vault-gold)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+}
+
+/* Collapsible section bars + emerald-tinted surfaces read with dark ink */
+.collapsible-toggle { color: #07120c !important; }
+.collapsible-count { color: rgba(7, 18, 12, 0.7); background: rgba(7, 18, 12, 0.16); }
+.collapse-chevron { color: rgba(7, 18, 12, 0.7); }
+.chat-user { color: #07120c !important; }
+
+/* Accounting-true status accents on the summary cards */
+.stat-expense { border-left-color: var(--vault-red) !important; }
+.stat-revenue { border-left-color: var(--vault-emerald) !important; }
+.stat-net { border-left-color: var(--vault-gold) !important; }
+
 /* ════════════════════════════════════════════════════════════
    v8 — New feature UI: tags, templates, heatmap calendar
    ════════════════════════════════════════════════════════════ */
@@ -3279,9 +3306,9 @@ input:focus, select:focus {
   font-size: 11px;
   font-weight: 600;
   border-radius: 999px;
-  color: var(--hud-cyan, #2bf5ff);
-  background: rgba(43, 245, 255, 0.1);
-  border: 1px solid var(--hud-line, rgba(43, 245, 255, 0.3));
+  color: var(--vault-emerald-strong);
+  background: rgba(52, 211, 153, 0.10);
+  border: 1px solid rgba(52, 211, 153, 0.28);
   letter-spacing: 0.02em;
 }
 
@@ -3303,13 +3330,13 @@ input:focus, select:focus {
   font-weight: 600;
   border-radius: 999px;
   cursor: pointer;
-  color: var(--hud-cyan, #2bf5ff);
-  background: rgba(43, 245, 255, 0.08);
-  border: 1px solid var(--hud-line-strong, rgba(43, 245, 255, 0.5));
+  color: var(--vault-emerald-strong);
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.30);
   transition: background 0.15s, transform 0.1s;
 }
 .template-chip:hover {
-  background: rgba(43, 245, 255, 0.18);
+  background: rgba(52, 211, 153, 0.16);
 }
 .template-chip:active {
   transform: scale(0.95);
@@ -3328,8 +3355,8 @@ input:focus, select:focus {
   gap: 12px;
   padding: 8px 12px;
   border-radius: 10px;
-  background: var(--hud-panel, rgba(10, 18, 38, 0.5));
-  border: 1px solid var(--hud-line, rgba(43, 245, 255, 0.2));
+  background: var(--vault-panel-2, rgba(24, 35, 58, 0.6));
+  border: 1px solid var(--vault-line, rgba(199, 210, 235, 0.12));
 }
 .template-manage-info {
   font-size: 13px;
@@ -3356,8 +3383,8 @@ input:focus, select:focus {
   position: relative;
   aspect-ratio: 1 / 1;
   border-radius: 6px;
-  background: rgba(43, 245, 255, 0.04);
-  border: 1px solid var(--hud-line, rgba(43, 245, 255, 0.12));
+  background: rgba(199, 210, 235, 0.04);
+  border: 1px solid var(--vault-line, rgba(199, 210, 235, 0.12));
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
@@ -3372,9 +3399,9 @@ input:focus, select:focus {
   color: var(--muted, #8aa);
   opacity: 0.8;
 }
-.heatmap-l1 { background: rgba(43, 245, 255, 0.18); }
-.heatmap-l2 { background: rgba(43, 245, 255, 0.42); }
-.heatmap-l3 { background: rgba(255, 61, 240, 0.55); border-color: var(--hud-magenta, #ff3df0); }
+.heatmap-l1 { background: rgba(52, 211, 153, 0.20); }
+.heatmap-l2 { background: rgba(52, 211, 153, 0.48); }
+.heatmap-l3 { background: rgba(232, 176, 75, 0.62); border-color: var(--vault-gold, #e8b04b); }
 .heatmap-l2 .heatmap-daynum,
 .heatmap-l3 .heatmap-daynum { color: #fff; opacity: 1; }
 .heatmap-clickable { cursor: pointer; transition: outline 0.12s ease; }
