@@ -1,5 +1,5 @@
-const CACHE_NAME = "accountbook-v13";
-const CDN_CACHE = "accountbook-cdn-v13";
+const CACHE_NAME = "accountbook-v14";
+const CDN_CACHE = "accountbook-cdn-v14";
 const PRECACHE = [
   "./index.html",
   "./styles.css?v=10",
@@ -7,6 +7,7 @@ const PRECACHE = [
   "./utils.js?v=6",
   "./firebase.js",
   "./firebase-config.js",
+  "./favicon.svg?v=1",
 ];
 
 // CDN hosts that serve static libraries/fonts we can safely cache for offline use.
